@@ -1,14 +1,14 @@
-# Kai — stickman mascot
+# Eddie — stickman mascot
 
 A bald, black-and-white stickman: a big round white head, thick black stick limbs,
 mitten hands and sneakers. He's built as a **poseable SVG rig**, so you don't need an AI
 model, an API key, or a subscription to use him.
 
-- `kai-rig.mjs` holds the rig: `character(pose)`, `head(expr)`, `POSES`, `PALETTE`.
+- `eddie-rig.mjs` holds the rig: `character(pose)`, `head(expr)`, `POSES`, `PALETTE`.
   Limbs take either absolute angles (`{a1, a2}`) or IK targets (`{target, bend}`).
-- `build.mjs` runs with `node assets/characters/kai/build.mjs` and writes `renders/`:
-  - `kai-sheet.png/svg` is the character sheet (poses + expressions)
-  - `kai-<pose>.png/svg` are single poses on a transparent background (840×1040 PNG), ready to
+- `build.mjs` runs with `node assets/characters/eddie/build.mjs` and writes `renders/`:
+  - `eddie-sheet.png/svg` is the character sheet (poses + expressions)
+  - `eddie-<pose>.png/svg` are single poses on a transparent background (840×1040 PNG), ready to
     overlay in Remotion, HyperFrames, CapCut, etc.
 
 Poses: `wave`, `explain`, `think`, `shocked`, `scared`, `celebrate`, `hustle`, `laptop`.

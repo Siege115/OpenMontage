@@ -1,4 +1,4 @@
-// Kai — a bald, black-and-white stickman mascot as a poseable SVG rig.
+// Eddie — a bald, black-and-white stickman mascot as a poseable SVG rig.
 //
 // Pure vector, no AI model, no API key: every pose is a function of a small
 // pose object (joint angles or IK targets + expression + props), so the same
@@ -193,7 +193,7 @@ export function character(pose) {
 }
 
 // Filter that gives every line a subtle hand-drawn wobble.
-export const DEFS = `<filter id="kaiInk" x="-10%" y="-10%" width="120%" height="120%">
+export const DEFS = `<filter id="eddieInk" x="-10%" y="-10%" width="120%" height="120%">
   <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4" result="n"/>
   <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>`;
 

@@ -1,8 +1,8 @@
 # What If You Never Had to Sleep Again?
 
 **Length:** ~6–7 min (≈880 spoken words at 130–150 wpm)
-**Format:** First-person-ish narration about "you", shown through Kai, with day-by-day escalation
-**Pose key:** `[pose]` = a pose in `kai-rig.mjs` (wave, explain, think, shocked, scared,
+**Format:** First-person-ish narration about "you", shown through Eddie, with day-by-day escalation
+**Pose key:** `[pose]` = a pose in `eddie-rig.mjs` (wave, explain, think, shocked, scared,
 celebrate, hustle, laptop). On-screen text is in **bold caps**.
 
 **Title options**
@@ -10,14 +10,14 @@ celebrate, hustle, laptop). On-screen text is in **bold caps**.
 2. What If You Never Slept Again? (Day 1 to Day 365)
 3. You Stop Needing Sleep. Here's What Happens.
 
-**Thumbnail:** Kai `[shocked]`, eyes wide, beside a clock with no hands.
+**Thumbnail:** Eddie `[shocked]`, eyes wide, beside a clock with no hands.
 Text: **"NEVER SLEEP?"**
 
 ---
 
 ## 0:00 — Hook
 
-`[shocked]` *Kai sits up in bed, wide awake. The clock reads 3:00 AM.*
+`[shocked]` *Eddie sits up in bed, wide awake. The clock reads 3:00 AM.*
 
 Tonight, you lie down, close your eyes… and nothing happens.
 
@@ -37,7 +37,7 @@ Let's find out what happens.
 
 ## 0:30 — Day 1: The Extra Hours
 
-`[celebrate]` *Kai bounces out of bed. Sparkles.*
+`[celebrate]` *Eddie bounces out of bed. Sparkles.*
 
 Day one is incredible.
 
@@ -55,7 +55,7 @@ You just got all of that back.
 
 ## 1:20 — Day 3: The World Is Asleep
 
-`[think]` *Kai sits alone on a dark street. Every window is black.*
+`[think]` *Eddie sits alone on a dark street. Every window is black.*
 
 By night three, you notice something strange.
 
@@ -78,7 +78,7 @@ a business. Start a YouTube channel.
 
 ## 2:20 — Day 7: Something's Off
 
-`[think]` *Kai stares at a page. The words are blurry.*
+`[think]` *Eddie stares at a page. The words are blurry.*
 
 A week in, you still don't feel tired. But your brain starts acting weird.
 
@@ -98,7 +98,7 @@ You have more time than ever… and you're learning less than ever.
 
 ## 3:20 — Day 14: The Brain Trash Problem
 
-`[scared]` *A cartoon brain beside Kai, slowly filling with gray gunk.*
+`[scared]` *A cartoon brain beside Eddie, slowly filling with gray gunk.*
 
 Two weeks in, things get stranger.
 
@@ -119,7 +119,7 @@ walked into a room.
 
 ## 4:30 — Day 21: The Microsleeps
 
-`[shocked]` *Kai is talking mid-sentence. The screen cuts to black for half a second, then back.*
+`[shocked]` *Eddie is talking mid-sentence. The screen cuts to black for half a second, then back.*
 
 Now for the creepiest part.
 
@@ -147,7 +147,7 @@ You're at Day 21.
 
 ## 5:40 — Day 30: The Breaking Point
 
-`[hustle]` *Kai pushes forward, sweating, as the background gets darker.*
+`[hustle]` *Eddie pushes forward, sweating, as the background gets darker.*
 
 One month without a single minute of sleep.
 
@@ -169,7 +169,7 @@ You removed the warning light… and kept driving.
 
 ## 6:40 — The Answer
 
-`[explain]` *Kai stands in the center. Calm music.*
+`[explain]` *Eddie stands in the center. Calm music.*
 
 So what if you never had to sleep again?
 
@@ -187,7 +187,7 @@ for real.
 
 ## 7:20 — Outro / CTA
 
-`[wave]` *Kai waves, then yawns.*
+`[wave]` *Eddie waves, then yawns.*
 
 So, would you take the deal? Eight extra hours a day, knowing what happens by Day 30?
 
@@ -196,7 +196,7 @@ asked: "What if you could hear everyone's thoughts?"
 
 `[celebrate]` Subscribe so you don't miss it…
 
-`[calm]` *Kai lies down, eyes close, a single "z" floats up.*
+`[calm]` *Eddie lies down, eyes close, a single "z" floats up.*
 
 …and get some sleep.
 

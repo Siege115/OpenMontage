@@ -1,10 +1,10 @@
-// Renders Kai's character sheet + per-pose transparent PNG/SVG files.
-//   node assets/characters/kai/build.mjs
+// Renders Eddie's character sheet + per-pose transparent PNG/SVG files.
+//   node assets/characters/eddie/build.mjs
 import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { character, head, DEFS, GROUND, POSES, PALETTE } from "./kai-rig.mjs";
+import { character, head, DEFS, GROUND, POSES, PALETTE } from "./eddie-rig.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, "renders");
@@ -24,7 +24,7 @@ function poseSVG(name, { bg = null } = {}) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <defs>${DEFS}</defs>${STYLE}${bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : ""}
 <ellipse cx="${cx}" cy="${gy + 2}" rx="${shadowW}" ry="9" fill="${PALETTE.shadow}"/>
-<g filter="url(#kaiInk)" transform="translate(${cx},${py})">${character(pose)}</g></svg>`;
+<g filter="url(#eddieInk)" transform="translate(${cx},${py})">${character(pose)}</g></svg>`;
 }
 
 const SHEET_POSES = ["wave", "explain", "think", "shocked", "scared", "celebrate", "laptop"];
@@ -34,7 +34,7 @@ function sheetSVG() {
   const W = 1920, H = 1200;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <defs>${DEFS}</defs>${STYLE}<rect width="100%" height="100%" fill="#ffffff"/>
-<text x="70" y="112" font-size="96" fill="${PALETTE.ink}">Kai</text>
+<text x="70" y="112" font-size="96" fill="${PALETTE.ink}">Eddie</text>
 <text x="232" y="108" font-size="40" fill="#55555f">stickman mascot · character sheet v2</text>`;
   // palette swatches
   const sw = [["ink", PALETTE.ink], ["paper", PALETTE.paper], ["shade", PALETTE.grey]];
@@ -52,7 +52,7 @@ function sheetSVG() {
     const sc = 0.92;
     const py = gy - groundFor(pose) * sc;
     s += `<ellipse cx="${cx}" cy="${gy + 2}" rx="${pose.lift ? 48 : 72}" ry="8" fill="${PALETTE.shadow}"/>
-<g filter="url(#kaiInk)" transform="translate(${cx},${py}) scale(${sc})">${character(pose)}</g>
+<g filter="url(#eddieInk)" transform="translate(${cx},${py}) scale(${sc})">${character(pose)}</g>
 <text x="${cx}" y="${gy + 60}" text-anchor="middle" font-size="38" fill="${PALETTE.ink}">${pose.label}</text>`;
   });
   s += `<path d="M70,790 L1850,790" stroke="#e4e4ea" stroke-width="3"/>
@@ -60,18 +60,18 @@ function sheetSVG() {
   const ew = (W - 140) / EXPRS.length;
   EXPRS.forEach((e, i) => {
     const cx = 70 + ew * (i + 0.5);
-    s += `<g filter="url(#kaiInk)" transform="translate(${cx},990) scale(1.1)">${head(e)}</g>
+    s += `<g filter="url(#eddieInk)" transform="translate(${cx},990) scale(1.1)">${head(e)}</g>
 <text x="${cx}" y="1130" text-anchor="middle" font-size="32" fill="${PALETTE.ink}">${e}</text>`;
   });
   return s + `</svg>`;
 }
 
 const files = [];
-writeFileSync(join(out, "kai-sheet.svg"), sheetSVG());
-files.push(["kai-sheet", 1920, 1200]);
+writeFileSync(join(out, "eddie-sheet.svg"), sheetSVG());
+files.push(["eddie-sheet", 1920, 1200]);
 for (const name of Object.keys(POSES)) {
-  writeFileSync(join(out, `kai-${name}.svg`), poseSVG(name));
-  files.push([`kai-${name}`, 420, 520]);
+  writeFileSync(join(out, `eddie-${name}.svg`), poseSVG(name));
+  files.push([`eddie-${name}`, 420, 520]);
 }
 
 const require = createRequire(import.meta.url);

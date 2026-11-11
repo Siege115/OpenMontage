@@ -1,4 +1,4 @@
-# Kai channel — niche research (vidIQ, Nov 2026)
+# Eddie channel — niche research (vidIQ, Nov 2026)
 
 ## Verdict: "What If" body/ability scenarios, told Day-by-Day
 
@@ -26,7 +26,7 @@ This is the hottest format right now: *30 Days Locked Inside a Supermarket* got 
 channels with 229 subscribers hit 1,000x+ breakouts. However:
 - It's flooded with near-identical AI-labeled clones (warehouse, gas station, mall, farm...).
 - Every scene needs detailed backgrounds, zombie hordes and props, which is heavy and costly to automate.
-- Kai would need gear (cap, backpack, weapon) to fit the genre.
+- Eddie would need gear (cap, backpack, weapon) to fit the genre.
 
 **Recommended play:** launch on What-If and borrow the survival genre's best trick,
 the **day-by-day escalation** ("Day 1… Day 7… Day 30…"). That pacing keeps
