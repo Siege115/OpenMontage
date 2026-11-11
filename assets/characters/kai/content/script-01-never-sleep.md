@@ -1,6 +1,6 @@
 # What If You Never Had to Sleep Again?
 
-**Length:** ~8 min (≈1,150 words at a relaxed narration pace)
+**Length:** ~6–7 min (≈880 spoken words at 130–150 wpm)
 **Format:** First-person-ish narration about "you", shown through Kai, with day-by-day escalation
 **Pose key:** `[pose]` = a pose in `kai-rig.mjs` (wave, explain, think, shocked, scared,
 celebrate, hustle, laptop). On-screen text is in **bold caps**.
