@@ -27,19 +27,19 @@ function poseSVG(name, { bg = null } = {}) {
 <g filter="url(#kaiInk)" transform="translate(${cx},${py})">${character(pose)}</g></svg>`;
 }
 
-const SHEET_POSES = ["wave", "explain", "think", "shocked", "celebrate", "laptop"];
-const EXPRS = ["neutral", "happy", "thinking", "shocked", "angry", "focused", "strain", "calm"];
+const SHEET_POSES = ["wave", "explain", "think", "shocked", "scared", "celebrate", "laptop"];
+const EXPRS = ["neutral", "happy", "thinking", "shocked", "scared", "angry", "focused", "strain", "calm"];
 
 function sheetSVG() {
   const W = 1920, H = 1200;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <defs>${DEFS}</defs>${STYLE}<rect width="100%" height="100%" fill="#ffffff"/>
 <text x="70" y="112" font-size="96" fill="${PALETTE.ink}">Kai</text>
-<text x="232" y="108" font-size="40" fill="#55555f">channel mascot · character sheet v1</text>`;
+<text x="232" y="108" font-size="40" fill="#55555f">stickman mascot · character sheet v2</text>`;
   // palette swatches
-  const sw = [["hoodie", PALETTE.hoodie], ["pants", PALETTE.pants], ["hair", PALETTE.hair], ["accent", PALETTE.accent], ["skin", PALETTE.skin]];
+  const sw = [["ink", PALETTE.ink], ["paper", PALETTE.paper], ["shade", PALETTE.grey]];
   sw.forEach(([n, c], i) => {
-    const x = 1190 + i * 140;
+    const x = 1420 + i * 150;
     s += `<rect x="${x}" y="58" width="44" height="44" rx="10" fill="${c}" stroke="${PALETTE.ink}" stroke-width="3"/>
 <text x="${x + 54}" y="90" font-size="28" fill="#55555f">${n}</text>`;
   });
@@ -60,7 +60,7 @@ function sheetSVG() {
   const ew = (W - 140) / EXPRS.length;
   EXPRS.forEach((e, i) => {
     const cx = 70 + ew * (i + 0.5);
-    s += `<g filter="url(#kaiInk)" transform="translate(${cx},990) scale(1.25)">${head(e)}</g>
+    s += `<g filter="url(#kaiInk)" transform="translate(${cx},990) scale(1.1)">${head(e)}</g>
 <text x="${cx}" y="1130" text-anchor="middle" font-size="32" fill="${PALETTE.ink}">${e}</text>`;
   });
   return s + `</svg>`;
