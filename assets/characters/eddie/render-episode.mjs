@@ -30,7 +30,17 @@ const FPS = Number(opt("--fps", 30)), CFPS = 15;
 const only = opt("--only", null);
 const NARRATION = opt("--narration", null);
 const TTS = opt("--tts", "piper");
-const W = 1920, H = 1080, GROUND = 870, SCALE = 1.85, PAD = 0.3;
+const W = 1920, H = 1080, GROUND = 870, SCALE = 1.85, PAD = 0.25;
+// steadier, clearer Piper delivery
+const PIPER = ["--sentence-silence", "0.25", "--length-scale", "1.12", "--noise-scale", "0.5", "--noise-w", "0.6"];
+// voice cleanup: trim silence, low-cut, cut mud, presence lift, gentle compression
+const VOICE_CHAIN = [
+  "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02",
+  "areverse", "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06", "areverse",
+  "highpass=f=75", "equalizer=f=250:t=q:w=1:g=-2.5", "equalizer=f=3200:t=q:w=1.2:g=3", "equalizer=f=9000:t=h:w=1:g=2",
+  "acompressor=threshold=-20dB:ratio=3:attack=5:release=90:makeup=2",
+].join(",");
+const sceneKeyOf = (b) => JSON.stringify(b.scene ?? null);
 const OW = VERTICAL ? 1080 : 1920, OH = VERTICAL ? 1920 : 1080, BASE = OH / H;
 const sh = (cmd, a, o) => execFileSync(cmd, a, o);
 const dur = (f) => Number(sh("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString());
@@ -73,7 +83,7 @@ if (NARRATION) {
   const voice = opt("--voice", TTS === "elevenlabs" ? (VOICE?.id ?? "JBFqnCBsd6RMkjVDRZzb") : join(outDir, "voices/en_US-ryan-high.onnx"));
   const list = [];
   for (const b of BEATS) {
-    const h = hash(TTS + voice + JSON.stringify(VOICE ?? {}) + b.text);
+    const h = hash(TTS + voice + JSON.stringify(VOICE ?? {}) + PIPER.join(" ") + b.text);
     const raw = join(outDir, "audio", `${h}.${TTS === "elevenlabs" ? "mp3" : "wav"}`), padded = join(outDir, "audio", `${h}.pad.wav`);
     if (!existsSync(raw)) {
       if (TTS === "elevenlabs") {
@@ -84,14 +94,22 @@ if (NARRATION) {
         });
         if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`);
         writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
-      } else sh("python3", ["-m", "piper", "-m", voice, "-f", raw, "--sentence-silence", "0.3", "--length-scale", "1.15"], { input: b.text });
+      } else sh("python3", ["-m", "piper", "-m", voice, "-f", raw, ...PIPER], { input: b.text });
     }
-    if (!existsSync(padded)) sh("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", `apad=pad_dur=${b.pause ?? PAD}`, "-ar", "44100", "-ac", "1", padded]);
-    b.speech = dur(raw); b.dur = dur(padded); list.push(`file '${padded}'`);
-    b.words = align(raw, b.text, h);
+    // trim leading/trailing silence + voice cleanup, then an even gap before the next line
+    const clean = join(outDir, "audio", `${h}.clean.wav`);
+    if (!existsSync(clean)) sh("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", VOICE_CHAIN, "-ar", "44100", "-ac", "1", clean]);
+    const next = BEATS[BEATS.indexOf(b) + 1];
+    const gap = b.pause ?? (next && sceneKeyOf(next) !== sceneKeyOf(b) ? 0.5 : PAD);
+    const paddedG = join(outDir, "audio", `${h}.gap${gap}.wav`);
+    if (!existsSync(paddedG)) sh("ffmpeg", ["-y", "-v", "error", "-i", clean, "-af", `apad=pad_dur=${gap}`, "-ar", "44100", "-ac", "1", paddedG]);
+    b.speech = dur(clean); b.dur = dur(paddedG); list.push(`file '${paddedG}'`);
+    b.words = align(clean, b.text, h + "c");
   }
   writeFileSync(join(outDir, "audio/list.txt"), list.join("\n"));
-  sh("ffmpeg", ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", join(outDir, "audio/list.txt"), "-c", "copy", narration]);
+  const joined = join(outDir, "narration-raw.wav");
+  sh("ffmpeg", ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", join(outDir, "audio/list.txt"), "-c", "copy", joined]);
+  sh("ffmpeg", ["-y", "-v", "error", "-i", joined, "-af", "loudnorm=I=-16:TP=-1.5:LRA=7", "-ar", "44100", "-ac", "1", narration]);
   let t0 = 0;
   for (const b of BEATS) { b.start = t0; t0 += b.dur; }
 }
@@ -149,8 +167,9 @@ BEATS.forEach((b, i) => {
   if (["celebrate", "idea"].includes(b.pose)) events.push([b.start + 0.05, "boing", 0.6]);
   if (b.blackout) events.push([b.start + 1.6, "thud", 0.7]);
 });
-const mix = new Float32Array(Math.ceil((TOTAL + 1) * 44100));
-for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v; }
+const mix = new Float32Array(Math.ceil((TOTAL + 1) * 44100)); // sfx
+for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
+const music = new Float32Array(mix.length);
 if (!args.includes("--no-music")) {
   // soft pad: Cmaj7 / Am7 / Fmaj7 / G6, 4 s each, gentle swell
   const chords = [[261.63, 329.63, 392, 493.88], [220, 261.63, 329.63, 392], [174.61, 220, 261.63, 329.63], [196, 246.94, 293.66, 329.63]];
@@ -159,17 +178,26 @@ if (!args.includes("--no-music")) {
     const envA = Math.min(1, lt / 0.8) * Math.min(1, (4 - lt) / 0.8);
     let v = 0; for (const fq of c) v += Math.sin(2 * Math.PI * fq * t) + 0.3 * Math.sin(2 * Math.PI * fq * 2 * t);
     v += 0.8 * Math.sin(2 * Math.PI * (c[0] / 2) * t);
-    mix[n] += v * 0.0085 * envA * (0.85 + 0.15 * Math.sin(2 * Math.PI * 0.2 * t)) * Math.min(1, t / 2, (TOTAL - t) / 2);
+    music[n] += v * 0.012 * envA * (0.85 + 0.15 * Math.sin(2 * Math.PI * 0.2 * t)) * Math.min(1, t / 2, (TOTAL - t) / 2);
   }
 }
-const fx16 = Buffer.alloc(44 + mix.length * 2);
-fx16.write("RIFF", 0); fx16.writeUInt32LE(36 + mix.length * 2, 4); fx16.write("WAVEfmt ", 8); fx16.writeUInt32LE(16, 16);
-fx16.writeUInt16LE(1, 20); fx16.writeUInt16LE(1, 22); fx16.writeUInt32LE(44100, 24); fx16.writeUInt32LE(88200, 28);
-fx16.writeUInt16LE(2, 32); fx16.writeUInt16LE(16, 34); fx16.write("data", 36); fx16.writeUInt32LE(mix.length * 2, 40);
-for (let n = 0; n < mix.length; n++) fx16.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(mix[n] * 32767))), 44 + n * 2);
-const fxTrack = join(outDir, "fx-music.wav"); writeFileSync(fxTrack, fx16);
+function writeWav(arr, path) {
+  const b = Buffer.alloc(44 + arr.length * 2);
+  b.write("RIFF", 0); b.writeUInt32LE(36 + arr.length * 2, 4); b.write("WAVEfmt ", 8); b.writeUInt32LE(16, 16);
+  b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(44100, 24); b.writeUInt32LE(88200, 28);
+  b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write("data", 36); b.writeUInt32LE(arr.length * 2, 40);
+  for (let n = 0; n < arr.length; n++) b.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(arr[n] * 32767))), 44 + n * 2);
+  writeFileSync(path, b);
+}
+const sfxTrack = join(outDir, "sfx.wav"), musicTrack = join(outDir, "music.wav");
+writeWav(mix, sfxTrack); writeWav(music, musicTrack);
 const mixed = join(outDir, "mix.wav");
-sh("ffmpeg", ["-y", "-v", "error", "-i", narration, "-i", fxTrack, "-filter_complex", "[0][1]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95", "-ar", "44100", mixed]);
+// music ducks under the voice; final mix normalised to YouTube loudness (-14 LUFS)
+sh("ffmpeg", ["-y", "-v", "error", "-i", narration, "-i", musicTrack, "-i", sfxTrack, "-filter_complex",
+  "[0]asplit=2[v][key];[1][key]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=350[duck];" +
+  "[v][duck][2]amix=inputs=3:duration=longest:normalize=0,loudnorm=I=-14:TP=-1.2:LRA=9",
+  "-ar", "44100", mixed]);
+if (args.includes("--audio-only")) { console.log("audio written", mixed); process.exit(0); }
 
 // ---------- 3. per-frame scene ----------
 const resolved = BEATS.map((b) => resolvePose({ ...POSE_LIB[b.pose], ...(b.expr ? { expr: b.expr } : {}) }));
