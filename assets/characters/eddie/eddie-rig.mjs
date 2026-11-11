@@ -84,6 +84,9 @@ function leg(H, spec, side) {
 // ---------- head + faces ----------
 
 const FACES = {
+  blink: `
+    <path d="M-19,6 L-9,6 M9,6 L19,6" stroke="${P.ink}" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M-7,25 Q0,29 7,25" fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round"/>`,
   neutral: `
     <ellipse cx="-14" cy="6" rx="4.4" ry="6" fill="${P.ink}"/><ellipse cx="14" cy="6" rx="4.4" ry="6" fill="${P.ink}"/>
     <path d="M-8,24 Q0,30 8,24" fill="none" stroke="${P.ink}" stroke-width="3.2" stroke-linecap="round"/>`,
@@ -156,6 +159,22 @@ export const PROPS = {
     <circle cx="0" cy="-34" r="11" fill="none" stroke="${P.ink}" stroke-width="3"/></g>`,
   sweat: (o) => `<g fill="${P.paper}" stroke="${P.ink}" stroke-width="2.5">
     <path d="M${o[0] + 52},${o[1] - 40} q7,10 0,14 q-7,-4 0,-14z"/><path d="M${o[0] + 66},${o[1] - 22} q6,8 0,12 q-6,-4 0,-12z"/></g>`,
+  bulb: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <path d="M-60,-10 L-80,-20 M60,-10 L80,-20 M0,-74 L0,-96 M-44,-56 L-60,-72 M44,-56 L60,-72" stroke="${P.ink}" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-22,22 Q-40,0 -36,-20 Q-30,-52 0,-54 Q30,-52 36,-20 Q40,0 22,22 Z" fill="#fff6c2" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>
+    <rect x="-18" y="22" width="36" height="20" rx="4" fill="${P.grey}" stroke="${P.ink}" stroke-width="4"/></g>`,
+  heldBook: (o) => `<g transform="translate(${o[0]},${o[1]}) scale(0.62)">
+    <path d="M0,-30 Q-30,-40 -60,-30 L-60,30 Q-30,20 0,30 Q30,20 60,30 L60,-30 Q30,-40 0,-30 Z" fill="#9cc3e6" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M0,-30 L0,30" stroke="${P.ink}" stroke-width="4"/></g>`,
+  trash: (o, n = 3) => {
+    let g = `<g transform="translate(${o[0]},${o[1]})">`;
+    for (let i = 0; i < n; i++) {
+      const x = ((i * 67) % 260) - 130, y = -Math.floor(i / 4) * 55, r = 34 + (i % 3) * 6;
+      g += `<path d="M${x - r},${y} Q${x - r - 6},${y - r * 1.4} ${x},${y - r * 1.6} Q${x + r + 6},${y - r * 1.4} ${x + r},${y} Z" fill="#5d6270" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M${x - 8},${y - r * 1.6} L${x},${y - r * 1.9} L${x + 8},${y - r * 1.6}" fill="none" stroke="${P.ink}" stroke-width="4" stroke-linecap="round"/>`;
+    }
+    return g + `</g>`;
+  },
   // ---- scene props (o = position relative to the pelvis) ----
   zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
     <text x="${o[0]}" y="${o[1]}" font-size="30">z</text><text x="${o[0] + 18}" y="${o[1] - 22}" font-size="40">z</text>
@@ -219,10 +238,13 @@ export function character(pose) {
 
   let g = leg([0, 0], legL, -1) + leg([0, 0], legR, 1);
   g += stick([[0, 0], N]);
-  g += arm(S, armL);
-  if (!pose.overHead) g += arm(S, armR);
+  if (!pose.frontArms) {
+    g += arm(S, armL);
+    if (!pose.overHead) g += arm(S, armR);
+  }
   g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr)}</g>`;
   if (pose.overHead) g += arm(S, pose.overHead);
+  if (pose.frontArms) g += arm(S, armL) + arm(S, armR);
   for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);
   return `<g transform="translate(0,${-(pose.lift ?? 0)})">${g}</g>`;
 }
@@ -313,6 +335,52 @@ export const POSES = {
     armR: { target: [90, -70], bend: -1, fist: true },
     legL: { a1: -30, a2: -22 }, legR: { a1: 24, a2: 10 },
     props: [{ type: "sweat", at: [30, -160] }],
+  },
+  type: {
+    label: "Typing", expr: "focused", sit: true, anim: "type",
+    legL: { a1: -60, a2: 8 }, legR: { a1: 60, a2: -8 },
+    armL: { target: [-32, -40], bend: -1 }, armR: { target: [32, -40], bend: 1 },
+  },
+  shrug: {
+    label: "Shrug", expr: "neutral", headTilt: 10,
+    armL: { target: [-66, -98], bend: -1 }, armR: { target: [66, -98], bend: 1 },
+  },
+  facepalm: {
+    label: "Facepalm", expr: "strain", headTilt: 8, lean: 4,
+    overHead: { target: [14, -128], bend: 1, fist: false, thumb: 200 },
+    armL: { a1: -12, a2: -4 },
+  },
+  idea: {
+    label: "Idea!", expr: "happy", headTilt: -4,
+    armR: { a1: 162, a2: 178, thumb: -90 }, armL: { target: [-30, -10], bend: -1 },
+    props: [{ type: "bulb", at: [0, -268] }],
+  },
+  crossArms: {
+    label: "Hmm.", expr: "focused", headTilt: -3,
+    armL: { target: [28, -54], bend: 1 }, armR: { target: [-28, -58], bend: -1 },
+    legL: { a1: -12, a2: -6 }, legR: { a1: 12, a2: 6 },
+  },
+  panic: {
+    label: "Panic", expr: "scared", anim: "panic", frontArms: true,
+    armL: { target: [-50, -170], bend: -1 }, armR: { target: [50, -170], bend: 1 },
+    legL: { a1: -16, a2: -6 }, legR: { a1: 14, a2: 8 },
+  },
+  read: {
+    label: "Reading", expr: "focused", headTilt: 6,
+    armL: { target: [-36, -50], bend: 1 }, armR: { target: [36, -50], bend: -1 },
+    props: [{ type: "heldBook", at: [0, -54] }],
+  },
+  lie: {
+    label: "Sleeping", expr: "calm", lean: -90, headTilt: 72,
+    armL: { a1: 90, a2: 92 }, armR: { a1: 92, a2: 94 },
+    legL: { a1: 90, a2: 90, shoeRot: 90 }, legR: { a1: 92, a2: 92, shoeRot: -90 },
+    props: [{ type: "zzz", at: [-180, -140] }],
+  },
+  walk: { label: "Walking", expr: "neutral", anim: "walk" },
+  lieAwake: {
+    label: "Awake in bed", expr: "neutral", lean: -90, headTilt: 72,
+    armL: { a1: 90, a2: 92 }, armR: { a1: 92, a2: 94 },
+    legL: { a1: 90, a2: 90, shoeRot: 90 }, legR: { a1: 92, a2: 92, shoeRot: -90 },
   },
   laptop: {
     label: "Automating", expr: "focused", headTilt: 4, sit: true,
