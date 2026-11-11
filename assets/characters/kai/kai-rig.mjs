@@ -9,7 +9,9 @@
 
 export const PALETTE = {
   ink: "#0d0d10",        // outlines
-  hair: "#141418",
+  hair: "#5b3a24",       // warm brown
+  hairDark: "#3a2416",
+  hairLight: "#8f6240",
   hoodie: "#2a2a31",
   hoodieFold: "#474752",
   pants: "#303b55",
@@ -215,13 +217,66 @@ const FACES = {
     <path d="M-11,26.5 L11,26.5 M-4,21 L-4,32 M4,21 L4,32" stroke="${P.ink}" stroke-width="1.8"/>`,
 };
 
+// One tapered, curved lock of hair: root -> tip, bowed sideways by `bend`.
+function lock(root, tip, width, bend, fill = P.hair, hi = true) {
+  const dx = tip[0] - root[0], dy = tip[1] - root[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const n = [-dy / len, dx / len];
+  const mid = [(root[0] + tip[0]) / 2 + n[0] * bend * len * 0.35, (root[1] + tip[1]) / 2 + n[1] * bend * len * 0.35];
+  const a = add(root, n, width / 2), b = add(root, n, -width / 2);
+  const ca = add(mid, n, width * 0.42), cb = add(mid, n, -width * 0.42);
+  let s = `<path d="M${pt(a)} Q${pt(ca)} ${pt(tip)} Q${pt(cb)} ${pt(b)} Z" fill="${fill}" stroke="${P.ink}" stroke-width="2.6" stroke-linejoin="round"/>`;
+  if (hi) {
+    const h1 = [root[0] + dx * 0.15, root[1] + dy * 0.15], h2 = [root[0] + dx * 0.6 + n[0] * bend * len * 0.18, root[1] + dy * 0.6 + n[1] * bend * len * 0.18];
+    s += `<path d="M${pt(h1)} Q${pt(mid)} ${pt(h2)}" fill="none" stroke="${P.hairLight}" stroke-width="2" stroke-linecap="round" opacity="0.8"/>`;
+  }
+  return s;
+}
+
+// Fluffy, tousled wavy hair: a back mass that covers the ears, a cap over the
+// crown, then layered pointed locks (crown, outward side flicks, a fringe that
+// falls over the forehead down to the brows).
+const WAVES = {
+  back() {
+    let s = `<path d="M-44,-34 Q-60,4 -52,34 Q-30,42 0,40 Q30,42 52,34 Q60,4 44,-34 Z" fill="${P.hairDark}" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>`;
+    for (const [r, t, b] of [[[-46, 14], [-64, 36], -0.5], [[-40, 26], [-48, 50], -0.4], [[-30, 30], [-30, 48], 0.3]])
+      s += lock(r, t, 14, b, P.hairDark, false) + lock([-r[0], r[1]], [-t[0], t[1]], 14, -b, P.hairDark, false);
+    return s;
+  },
+  front(seed = 7) {
+    const r = rng(seed);
+    let s = `<path d="M-47,0 Q-58,-72 0,-74 Q58,-72 47,0 L38,-14 Q0,-30 -38,-14 Z" fill="${P.hair}" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>`;
+    // side locks hanging over the ears, flicking outward
+    const side = [[[-38, -24], [-62, -6], -0.4], [[-40, -6], [-62, 16], -0.45], [[-40, 10], [-56, 36], -0.4], [[-34, 18], [-40, 40], 0.35]];
+    for (const [ro, ti, b] of side) {
+      const j = (r() - 0.5) * 4;
+      s += lock(ro, [ti[0] * 0.92, ti[1] + j], 20, b * 1.5) + lock([-ro[0], ro[1]], [-ti[0] * 0.92, ti[1] - j], 20, -b * 1.5);
+    }
+    // edge flicks: short curled wisps poking out of the silhouette
+    for (let i = 0; i < 9; i++) {
+      const t = rad(172 - (164 * i) / 8);
+      const root = [Math.cos(t) * 42, -Math.sin(t) * 50 - 18];
+      const out = [Math.cos(t), -Math.sin(t)];
+      const side = Math.cos(t) >= 0 ? 1 : -1;
+      const tip = [root[0] + out[0] * 18 + side * 6, root[1] + out[1] * 18 + 10];
+      s += lock(root, tip, 18, side * (0.9 + r() * 0.3));
+    }
+    // layered locks flowing down from the crown (no single swirl point)
+    for (const [x0, y0, x1, y1, b] of [[-26, -64, -42, -38, -0.7], [-8, -70, -22, -42, -0.6], [10, -70, 2, -42, 0.6], [26, -64, 30, -38, 0.7], [-36, -50, -50, -22, -0.7], [38, -50, 50, -22, 0.7]])
+      s += lock([x0, y0], [x1 + (r() - 0.5) * 4, y1], 24, b);
+    // fringe over the forehead, tips sweeping to alternate sides
+    const fringe = [[-30, -10, -40, 0.5], [-18, -12, -26, -0.4], [-6, -13, -10, 0.5], [6, -12, 4, -0.5], [18, -13, 20, 0.4], [30, -10, 38, -0.5]];
+    for (const [x, y, tx, b] of fringe) s += lock([x * 0.75, -44], [tx + (r() - 0.5) * 4, y + 2 + r() * 3], 22, b * 1.4);
+    return s;
+  },
+};
+
 export function head(expr = "neutral", seed = 7) {
   return (
-    `<ellipse cx="-41" cy="8" rx="6" ry="9" fill="${P.skin}" stroke="${P.ink}" stroke-width="3.5"/>` +
-    `<ellipse cx="41" cy="8" rx="6" ry="9" fill="${P.skin}" stroke="${P.ink}" stroke-width="3.5"/>` +
+    WAVES.back() +
     `<ellipse cx="0" cy="0" rx="40" ry="44" fill="${P.skin}" stroke="${P.ink}" stroke-width="4"/>` +
     (FACES[expr] || FACES.neutral) +
-    curls(seed)
+    WAVES.front(seed)
   );
 }
 
