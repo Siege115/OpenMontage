@@ -16,7 +16,7 @@ export const PALETTE = {
 
 const P = PALETTE;
 const LEN = { torso: 92, upper: 50, fore: 46, thigh: 60, shin: 58 };
-const HEAD_R = 48;
+const HEAD_R = 54; // egg-shaped head: rx 50, ry 56 (see head())
 const LIMB = 7; // stick thickness
 
 const rad = (d) => (d * Math.PI) / 180;
@@ -127,12 +127,24 @@ const FACES = {
     <path d="M-11,26.5 L11,26.5 M-4,21 L-4,32 M4,21 L4,32" stroke="${P.ink}" stroke-width="1.8"/>`,
 };
 
-// Bald round head; the face is scaled up a touch so it reads at thumbnail size.
-export function head(expr = "neutral") {
+// Bald egg-shaped head (slightly wider at the top). `mouth` (0-2) swaps the expression's
+// mouth for a talking shape, for lip flaps synced to the narration.
+const isMouth = (el) => /cy="28"|d="M-?\d+(\.\d+)?,(19|2\d|3\d)|<rect x="-11" y="21"/.test(el);
+const TALK = [
+  null,
+  `<ellipse cx="0" cy="26" rx="7" ry="5" fill="${P.ink}"/>`,
+  `<path d="M-12,20 Q0,18 12,20 Q11,36 0,37 Q-11,36 -12,20 Z" fill="${P.ink}"/><path d="M-6,32 Q0,28 6,32 Q3,36 0,36 Q-3,36 -6,32 Z" fill="${P.grey}"/>`,
+];
+export function head(expr = "neutral", mouth = 0) {
+  let face = FACES[expr] || FACES.neutral;
+  if (mouth > 0) {
+    const els = face.match(/<[^>]+\/>/g) || [];
+    face = els.filter((e) => !isMouth(e)).join("") + TALK[mouth];
+  }
   return (
-    `<circle cx="0" cy="0" r="${HEAD_R}" fill="${P.paper}" stroke="${P.ink}" stroke-width="4.5"/>` +
-    `<path d="M-30,-30 Q-22,-38 -12,-41" fill="none" stroke="${P.grey}" stroke-width="3" stroke-linecap="round"/>` +
-    `<g transform="translate(0,2) scale(1.12)">${FACES[expr] || FACES.neutral}</g>`
+    `<path d="M0,-58 C34,-58 52,-30 51,2 C50,34 30,54 0,54 C-30,54 -50,34 -51,2 C-52,-30 -34,-58 0,-58 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="4.5"/>` +
+    `<path d="M-32,-34 Q-24,-44 -12,-47" fill="none" stroke="${P.grey}" stroke-width="3" stroke-linecap="round"/>` +
+    `<g transform="translate(0,4) scale(1.22)">${face}</g>`
   );
 }
 
@@ -242,7 +254,7 @@ export function character(pose) {
     g += arm(S, armL);
     if (!pose.overHead) g += arm(S, armR);
   }
-  g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr)}</g>`;
+  g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr, pose.mouth ?? 0)}</g>`;
   if (pose.overHead) g += arm(S, pose.overHead);
   if (pose.frontArms) g += arm(S, armL) + arm(S, armR);
   for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);
