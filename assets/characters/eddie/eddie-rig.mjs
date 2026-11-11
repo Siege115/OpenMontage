@@ -135,7 +135,7 @@ export function head(expr = "neutral") {
 
 // ---------- props / fx (all black & white) ----------
 
-const PROPS = {
+export const PROPS = {
   waveLines: (o) => `<g fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round">
     <path d="M${o[0] + 18},${o[1] - 16} Q${o[0] + 28},${o[1]} ${o[0] + 18},${o[1] + 16}"/>
     <path d="M${o[0] + 28},${o[1] - 24} Q${o[0] + 42},${o[1]} ${o[0] + 28},${o[1] + 24}"/></g>`,
@@ -156,6 +156,41 @@ const PROPS = {
     <circle cx="0" cy="-34" r="11" fill="none" stroke="${P.ink}" stroke-width="3"/></g>`,
   sweat: (o) => `<g fill="${P.paper}" stroke="${P.ink}" stroke-width="2.5">
     <path d="M${o[0] + 52},${o[1] - 40} q7,10 0,14 q-7,-4 0,-14z"/><path d="M${o[0] + 66},${o[1] - 22} q6,8 0,12 q-6,-4 0,-12z"/></g>`,
+  // ---- scene props (o = position relative to the pelvis) ----
+  zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
+    <text x="${o[0]}" y="${o[1]}" font-size="30">z</text><text x="${o[0] + 18}" y="${o[1] - 22}" font-size="40">z</text>
+    <text x="${o[0] + 42}" y="${o[1] - 52}" font-size="52">Z</text></g>`,
+  clock: (o, t = "3:00") => `<g transform="translate(${o[0]},${o[1]})">
+    <rect x="-58" y="-34" width="116" height="62" rx="12" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
+    <text x="0" y="14" text-anchor="middle" font-family="InkHand, 'Comic Sans MS', sans-serif" font-size="40" fill="${P.ink}">${t}</text>
+    <path d="M-40,28 L-48,40 M40,28 L48,40" stroke="${P.ink}" stroke-width="5" stroke-linecap="round"/></g>`,
+  bed: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <rect x="-150" y="-30" width="300" height="40" rx="8" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
+    <rect x="-150" y="-92" width="22" height="132" rx="6" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
+    <rect x="128" y="-62" width="22" height="102" rx="6" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
+    <rect x="-122" y="-56" width="64" height="26" rx="12" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>
+    <path d="M-40,-30 Q40,-44 128,-30" fill="none" stroke="${P.grey}" stroke-width="5" stroke-linecap="round"/></g>`,
+  brain: (o, level = 0) => {
+    const lv = Math.max(0, Math.min(1, level));
+    const top = 40 - 88 * lv;
+    return `<g transform="translate(${o[0]},${o[1]})">
+    <defs><clipPath id="brainClip"><path d="M-60,10 Q-70,-40 -30,-50 Q-10,-72 18,-58 Q60,-62 62,-20 Q78,10 50,34 Q20,52 -10,40 Q-50,46 -60,10 Z"/></clipPath></defs>
+    <path d="M-60,10 Q-70,-40 -30,-50 Q-10,-72 18,-58 Q60,-62 62,-20 Q78,10 50,34 Q20,52 -10,40 Q-50,46 -60,10 Z" fill="${P.paper}"/>
+    <rect x="-80" y="${f(top)}" width="160" height="120" fill="#8a8a92" clip-path="url(#brainClip)"/>
+    <path d="M-60,10 Q-70,-40 -30,-50 Q-10,-72 18,-58 Q60,-62 62,-20 Q78,10 50,34 Q20,52 -10,40 Q-50,46 -60,10 Z" fill="none" stroke="${P.ink}" stroke-width="5"/>
+    <path d="M-34,-30 Q-20,-14 -36,0 M0,-50 Q-8,-24 6,-6 Q16,10 2,26 M30,-36 Q20,-18 36,-4" fill="none" stroke="${P.ink}" stroke-width="3.5" stroke-linecap="round"/></g>`;
+  },
+  moon: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <path d="M10,-40 A40,40 0 1 0 40,16 A32,32 0 1 1 10,-40 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>
+    <path d="M-120,-20 l4,10 l10,4 l-10,4 l-4,10 l-4,-10 l-10,-4 l10,-4z M90,40 l3,7 l7,3 l-7,3 l-3,7 l-3,-7 l-7,-3 l7,-3z" fill="${P.paper}" stroke="${P.ink}" stroke-width="2.5"/></g>`,
+  book: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <path d="M0,-30 Q-30,-40 -60,-30 L-60,30 Q-30,20 0,30 Q30,20 60,30 L60,-30 Q30,-40 0,-30 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M0,-30 L0,30 M-48,-16 L-12,-20 M-48,-4 L-12,-8 M12,-20 L48,-16 M12,-8 L48,-4" stroke="${P.grey}" stroke-width="3" stroke-linecap="round"/></g>`,
+  house: (o, lit = false) => `<g transform="translate(${o[0]},${o[1]})">
+    <path d="M-70,0 L-70,-110 L0,-170 L70,-110 L70,0 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="-46" y="-96" width="34" height="34" fill="${lit ? "#f4e7a1" : P.ink}" stroke="${P.ink}" stroke-width="4"/>
+    <rect x="12" y="-96" width="34" height="34" fill="${lit ? "#f4e7a1" : P.ink}" stroke="${P.ink}" stroke-width="4"/>
+    <rect x="-16" y="-50" width="32" height="50" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/></g>`,
 };
 
 // ---------- full character ----------
@@ -188,8 +223,42 @@ export function character(pose) {
   if (!pose.overHead) g += arm(S, armR);
   g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr)}</g>`;
   if (pose.overHead) g += arm(S, pose.overHead);
-  for (const p of pose.props ?? []) g += PROPS[p.type](p.at);
+  for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);
   return `<g transform="translate(0,${-(pose.lift ?? 0)})">${g}</g>`;
+}
+
+// Resolve every limb of a pose into absolute {a1, a2} angles, so two poses can be
+// interpolated joint-by-joint (see lerpPose).
+export function resolvePose(pose) {
+  const lean = pose.lean ?? 0;
+  const u = dir(180 - lean);
+  const N = add([0, 0], u, LEN.torso);
+  const S = add(N, u, -14);
+  const toAngles = (root, spec, l1, l2, dflt) => {
+    const sp = spec ?? dflt;
+    const [m, e] = limb(root, sp, l1, l2);
+    return { ...sp, target: undefined, bend: undefined, a1: angleOf(root, m), a2: angleOf(m, e) };
+  };
+  const out = { ...pose, lean, headTilt: pose.headTilt ?? 0, lift: pose.lift ?? 0 };
+  out.armL = toAngles(S, pose.armL, LEN.upper, LEN.fore, { a1: -14, a2: -6 });
+  out.armR = toAngles(S, pose.overHead ?? pose.armR, LEN.upper, LEN.fore, { a1: 14, a2: 6 });
+  out.overHead = pose.overHead ? out.armR : undefined;
+  out.legL = toAngles([0, 0], pose.legL, LEN.thigh, LEN.shin, { a1: -10, a2: -4 });
+  out.legR = toAngles([0, 0], pose.legR, LEN.thigh, LEN.shin, { a1: 10, a2: 4 });
+  return out;
+}
+
+const lerpAngle = (a, b, t) => { let d = ((b - a + 540) % 360) - 180; return a + d * t; };
+const lerpLimb = (a, b, t) => ({ ...(t < 0.5 ? a : b), a1: lerpAngle(a.a1, b.a1, t), a2: lerpAngle(a.a2, b.a2, t) });
+
+// Blend two resolved poses (t: 0..1). Expression and props switch at the midpoint.
+export function lerpPose(a, b, t) {
+  const pick = t < 0.5 ? a : b;
+  const m = (x, y) => x + (y - x) * t;
+  const out = { ...pick, lean: m(a.lean, b.lean), headTilt: m(a.headTilt, b.headTilt), lift: m(a.lift, b.lift) };
+  for (const k of ["armL", "armR", "legL", "legR"]) out[k] = lerpLimb(a[k], b[k], t);
+  out.overHead = pick.overHead ? out.armR : undefined;
+  return out;
 }
 
 // Filter that gives every line a subtle hand-drawn wobble.

@@ -16,3 +16,17 @@ Expressions: `neutral`, `happy`, `thinking`, `shocked`, `scared`, `angry`, `focu
 
 To add a pose, add an entry to `POSES` and re-run the build. Because each pose is just
 numbers, two poses can be tweened for animation.
+
+## Making an episode
+
+1. Write a beat sheet (see `content/ep01-never-sleep.beats.mjs`). Each beat has narration
+   text, a pose, and optionally an expression, props, on-screen text and a "DAY X" stamp.
+2. Get a Piper voice (free, local). Install it with `pip install piper-tts`, then download e.g.
+   `en_US-ryan-high.onnx` and its `.onnx.json` from `huggingface.co/rhasspy/piper-voices` into
+   `projects/<name>/voices/`.
+3. Render:
+   ```
+   node assets/characters/eddie/render-episode.mjs assets/characters/eddie/content/ep01-never-sleep.beats.mjs projects/eddie-never-sleep
+   ```
+   Add `--only 0-5` to preview a range of beats. The output is `projects/<name>/episode.mp4`
+   (1080p, 24fps), with narration, captions and tweened poses.
