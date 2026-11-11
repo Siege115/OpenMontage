@@ -1,6 +1,6 @@
 # Kai — channel mascot
 
-A hand-drawn kid in a hoodie (spiky black hair, black hoodie, navy cargo pants,
+A hand-drawn kid in a hoodie (loose curly black hair, black hoodie, navy cargo pants,
 sneakers). His signature details are **orange headphones resting on his neck and orange
 hoodie drawstrings**. He's built as a **poseable SVG rig**, so you don't need an AI model, an
 API key, or a subscription to use him.

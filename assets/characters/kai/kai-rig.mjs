@@ -144,26 +144,40 @@ function torso(lean) {
 
 // ---------- head + faces ----------
 
-function hairPath(seed = 7) {
+// Loose curly hair: a cloud of overlapping curls. Each curl is drawn twice,
+// outlined first and then filled on top, so only the cloud's outer silhouette
+// keeps an ink line. Light "C" strokes on top give the curl texture.
+function curls(seed = 7) {
   const r = rng(seed);
-  const pts = [];
-  const n = 16;
+  const c = [];
+  // outer ring over the crown, down to the ears
+  const n = 11;
   for (let i = 0; i <= n; i++) {
-    const t = rad(205 - (230 * i) / n);
-    const R = i % 2 ? 56 + r() * 10 : 43 + r() * 3;
-    pts.push([Math.cos(t) * R, -Math.sin(t) * R * 1.06]);
+    const t = rad(192 - (204 * i) / n);
+    const R = 38 + r() * 3;
+    c.push([Math.cos(t) * R, -Math.sin(t) * R * 1.05 - 6, 11 + r() * 3]);
   }
-  // fringe: from screen-right temple back across the forehead
-  const fr = [[40, 2], [37, -10]];
-  const tips = 5;
-  for (let i = 0; i <= tips * 2; i++) {
-    const x = 34 - (68 * i) / (tips * 2);
-    const tip = i % 2 === 1;
-    // chunky bangs that sweep slightly to screen-left
-    fr.push([x + (tip ? -4 + (r() - 0.5) * 3 : 0), tip ? -6 + r() * 4 : -20 - r() * 3]);
+  // inner fill so the crown reads as one mass
+  for (let i = 0; i < 5; i++) {
+    const t = rad(150 - (120 * i) / 4);
+    c.push([Math.cos(t) * 20, -Math.sin(t) * 20 - 22, 14 + r() * 2]);
   }
-  fr.push([-37, -10], [-40, 2]);
-  return "M" + pts.concat(fr).map(pt).join(" L") + " Z";
+  // loose fringe curls, kept above the brows
+  const fringe = [[-26, -24, 9.5], [-10, -27, 10], [7, -25, 9.5], [23, -26, 9.5]];
+  for (const [x, y, rr] of fringe) c.push([x + (r() - 0.5) * 3, y + r() * 2, rr]);
+
+  const circ = (k, extra) => `<circle cx="${f(k[0])}" cy="${f(k[1])}" r="${f(k[2] + extra)}"/>`;
+  let s = `<g fill="${P.hair}" stroke="${P.ink}" stroke-width="7">${c.map((k) => circ(k, 0)).join("")}</g>`;
+  s += `<g fill="${P.hair}">${c.map((k) => circ(k, 0)).join("")}</g>`;
+  // curl swirls
+  s += `<g fill="none" stroke="#50505c" stroke-width="2" stroke-linecap="round">`;
+  for (const [x, y, rr] of c.filter((_, i) => i % 2 === 0)) {
+    const q = rr * 0.45, a0 = r() * 360;
+    const p1 = [x + Math.cos(rad(a0)) * q, y + Math.sin(rad(a0)) * q];
+    const p2 = [x + Math.cos(rad(a0 + 200)) * q, y + Math.sin(rad(a0 + 200)) * q];
+    s += `<path d="M${pt(p1)} A${f(q)},${f(q)} 0 1 1 ${pt(p2)}"/>`;
+  }
+  return s + `</g>`;
 }
 
 const FACES = {
@@ -207,7 +221,7 @@ export function head(expr = "neutral", seed = 7) {
     `<ellipse cx="41" cy="8" rx="6" ry="9" fill="${P.skin}" stroke="${P.ink}" stroke-width="3.5"/>` +
     `<ellipse cx="0" cy="0" rx="40" ry="44" fill="${P.skin}" stroke="${P.ink}" stroke-width="4"/>` +
     (FACES[expr] || FACES.neutral) +
-    `<path d="${hairPath(seed)}" fill="${P.hair}" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>`
+    curls(seed)
   );
 }
 
