@@ -222,7 +222,8 @@ function frameSVG(t) {
   const sceneChanged = i > 0 && sceneKey(pb) !== sceneKey(b);
   const poseChanged = i > 0 && !sceneChanged && pb.pose !== b.pose;
   // pose snap: one in-between frame, then the key pose
-  const k = i === 0 || sceneChanged ? 1 : ltc < 1 / CFPS ? 0.5 : 1;
+  const lyingSwap = [pb.pose, b.pose].some((x) => x === "lie" || x === "lieAwake") && pb.pose !== b.pose;
+  const k = i === 0 || sceneChanged || lyingSwap ? 1 : ltc < 1 / CFPS ? 0.5 : 1;
   const pose = lerpPose(resolved[Math.max(0, i - 1)], resolved[i], k);
   const anim = POSE_LIB[b.pose].anim;
   const ph = tc * 2 * Math.PI;
