@@ -18,6 +18,7 @@ const beatsPath = resolve(args[0]);
 const outDir = resolve(args[1]);
 const voice = resolve(opt("--voice", join(outDir, "voices/en_US-ryan-high.onnx")));
 const FPS = Number(opt("--fps", 24));
+const LENGTH_SCALE = opt("--length-scale", "1.15"); // >1 = slower narration
 const only = opt("--only", null);
 const W = 1920, H = 1080, GROUND = 870, SCALE = 1.85, PAD = 0.4;
 
@@ -30,9 +31,9 @@ mkdirSync(join(outDir, "audio"), { recursive: true });
 const dur = (f) => Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString());
 const list = [];
 for (const b of BEATS) {
-  const h = createHash("sha1").update(voice + b.text).digest("hex").slice(0, 12);
+  const h = createHash("sha1").update(voice + LENGTH_SCALE + b.text).digest("hex").slice(0, 12);
   const raw = join(outDir, "audio", `${h}.wav`), padded = join(outDir, "audio", `${h}.pad.wav`);
-  if (!existsSync(raw)) execFileSync("python3", ["-m", "piper", "-m", voice, "-f", raw, "--sentence-silence", "0.25"], { input: b.text });
+  if (!existsSync(raw)) execFileSync("python3", ["-m", "piper", "-m", voice, "-f", raw, "--sentence-silence", "0.3", "--length-scale", LENGTH_SCALE], { input: b.text });
   if (!existsSync(padded)) execFileSync("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", `apad=pad_dur=${PAD}`, "-ar", "44100", "-ac", "1", padded]);
   b.speech = dur(raw); b.dur = dur(padded); list.push(`file '${padded}'`);
 }
