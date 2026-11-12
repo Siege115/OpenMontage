@@ -148,6 +148,11 @@ export const SCENES = {
     bg += `<path d="M1080,${FLOOR} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="${day ? "#eee" : "#ffe39a"}" ${o(4)}/>` + (day ? "" : glow(1170, 450, 330, "#ffe39a", 0.4));
     bg += `<rect x="0" y="${FLOOR}" width="${W}" height="70" fill="#9aa0ad"/><path d="M0,${FLOOR} L${W},${FLOOR} M0,${FLOOR + 70} L${W},${FLOOR + 70}" ${o(5)}/><rect x="0" y="${FLOOR + 70}" width="${W}" height="200" fill="#4b4f5c"/>`;
     for (let x = 40; x < W; x += 260) bg += `<rect x="${x}" y="${FLOOR + 140}" width="140" height="14" rx="6" fill="#e8e3c8"/>`;
+    // passing cars
+    for (const [i, [spd, col]] of [[520, "#e5584f"], [-380, "#5b8fd9"]].entries()) {
+      const x = ((t * spd + i * 1300) % 2900 + 2900) % 2900 - 500, y = FLOOR + 30 + i * 90, d = spd > 0 ? 1 : -1;
+      bg += `<g transform="translate(${x},${y}) scale(${d * 0.8},0.8)"><path d="M-150,40 L-150,-10 Q-130,-30 -60,-34 L-20,-80 Q20,-92 90,-86 Q120,-80 140,-34 L170,-30 Q190,-20 190,10 L190,40 Z" fill="${col}" ${o(5)}/><path d="M-10,-40 L20,-76 Q50,-82 80,-78 L110,-40 Z" fill="#cfe9f7" ${o(3)}/><circle cx="-80" cy="40" r="28" fill="#2b2f3a" ${o(5)}/><circle cx="120" cy="40" r="28" fill="#2b2f3a" ${o(5)}/></g>`;
+    }
     return { bg, fg: "" };
   },
 
@@ -197,6 +202,10 @@ export const SCENES = {
     // table + cups (left)
     bg += `<ellipse cx="420" cy="720" rx="190" ry="34" fill="#c99b72" ${o(5)}/><path d="M420,750 L420,860 M360,870 L480,870" ${o(7)}/>
       <rect x="370" y="676" width="44" height="40" rx="6" fill="#fff" ${o(4)}/><rect x="450" y="680" width="40" height="36" rx="6" fill="#f0b27a" ${o(4)}/>`;
+    for (const [i, cx0] of [[0, 392], [1, 470], [2, 1390]].entries()) for (let k = 0; k < 2; k++) {
+      const p = (t * 0.5 + k / 2 + i * 0.3) % 1, base = i === 2 ? 550 : 670;
+      bg += `<path d="M${cx0 + Math.sin(t * 2 + k + i) * 6},${base - p * 70} q8,-12 0,-24 q-8,-12 0,-24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="${(1 - p) * 0.8}"/>`;
+    }
     return { bg, fg: "" };
   },
 

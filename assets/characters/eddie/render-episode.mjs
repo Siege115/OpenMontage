@@ -17,7 +17,9 @@ import { createRequire } from "node:module";
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { character, resolvePose, lerpPose, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
-import { SCENES } from "./scenes.mjs";
+import { SCENES as BASE_SCENES } from "./scenes.mjs";
+import { EXTRA_SCENES } from "./scenes-extra.mjs";
+const SCENES = { ...BASE_SCENES, ...EXTRA_SCENES };
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -26,7 +28,7 @@ const beatsPath = resolve(args[0]);
 const outDir = resolve(args[1]);
 const ASPECT = opt("--aspect", "16:9");
 const VERTICAL = ASPECT === "9:16";
-const FPS = Number(opt("--fps", 30)), CFPS = 15;
+const FPS = Number(opt("--fps", 30)), CFPS = 30; // every frame animates
 const only = opt("--only", null);
 const NARRATION = opt("--narration", null);
 const TTS = opt("--tts", "piper");
@@ -35,8 +37,8 @@ const W = 1920, H = 1080, GROUND = 870, SCALE = 1.85, PAD = 0.25;
 const PIPER = ["--sentence-silence", "0.25", "--length-scale", "1.12", "--noise-scale", "0.5", "--noise-w", "0.6"];
 // voice cleanup: trim silence, low-cut, cut mud, presence lift, gentle compression
 const VOICE_CHAIN = [
-  "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02",
-  "areverse", "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06", "areverse",
+  "silenceremove=start_periods=1:start_threshold=-52dB:start_silence=0.05", "afade=t=in:d=0.012",
+  "areverse", "silenceremove=start_periods=1:start_threshold=-52dB:start_silence=0.12", "afade=t=in:d=0.04", "areverse",
   "highpass=f=75", "equalizer=f=250:t=q:w=1:g=-2.5", "equalizer=f=3200:t=q:w=1.2:g=3", "equalizer=f=9000:t=h:w=1:g=2",
   "acompressor=threshold=-20dB:ratio=3:attack=5:release=90:makeup=2",
 ].join(",");
@@ -82,30 +84,44 @@ if (NARRATION) {
 } else {
   const voice = opt("--voice", TTS === "elevenlabs" ? (VOICE?.id ?? "JBFqnCBsd6RMkjVDRZzb") : join(outDir, "voices/en_US-ryan-high.onnx"));
   const list = [];
+  // text for the TTS engine only (captions keep the script text): no quote marks or ellipses
+  const ttsText = (b) => (b.say ?? b.text).replace(/…/g, ",").replace(/[“”"]/g, "").replace(/(^|\s)'([^']+)'/g, "$1$2").replace(/café/gi, "cafe");
+  const VARIANTS = [PIPER, PIPER.map((v, i) => [0, 0, 0, "1.06", 0, "0.4", 0, "0.5"][i] || v), PIPER.map((v, i) => [0, 0, 0, "1.18", 0, "0.62", 0, "0.75"][i] || v)];
+  let regenerated = 0;
   for (const b of BEATS) {
-    const h = hash(TTS + voice + JSON.stringify(VOICE ?? {}) + PIPER.join(" ") + b.text);
-    const raw = join(outDir, "audio", `${h}.${TTS === "elevenlabs" ? "mp3" : "wav"}`), padded = join(outDir, "audio", `${h}.pad.wav`);
-    if (!existsSync(raw)) {
-      if (TTS === "elevenlabs") {
-        const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
-          method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY || "proxy-injected", "Content-Type": "application/json" },
-          body: JSON.stringify({ text: b.text, model_id: VOICE?.model ?? "eleven_multilingual_v2", voice_settings: VOICE?.settings,
-            previous_text: ALL[b.idx - 1]?.text, next_text: ALL[b.idx + 1]?.text }),
-        });
-        if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`);
-        writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
-      } else sh("python3", ["-m", "piper", "-m", voice, "-f", raw, ...PIPER], { input: b.text });
-    }
-    // trim leading/trailing silence + voice cleanup, then an even gap before the next line
-    const clean = join(outDir, "audio", `${h}.clean.wav`);
-    if (!existsSync(clean)) sh("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", VOICE_CHAIN, "-ar", "44100", "-ac", "1", clean]);
     const next = BEATS[BEATS.indexOf(b) + 1];
     const gap = b.pause ?? (next && sceneKeyOf(next) !== sceneKeyOf(b) ? 0.5 : PAD);
-    const paddedG = join(outDir, "audio", `${h}.gap${gap}.wav`);
-    if (!existsSync(paddedG)) sh("ffmpeg", ["-y", "-v", "error", "-i", clean, "-af", `apad=pad_dur=${gap}`, "-ar", "44100", "-ac", "1", paddedG]);
-    b.speech = dur(clean); b.dur = dur(paddedG); list.push(`file '${paddedG}'`);
-    b.words = align(clean, b.text, h + "c");
+    let best = null;
+    for (let v = 0; v < (TTS === "elevenlabs" ? 1 : VARIANTS.length); v++) {
+      const h = hash(TTS + voice + JSON.stringify(VOICE ?? {}) + VARIANTS[v].join(" ") + ttsText(b) + VOICE_CHAIN);
+      const raw = join(outDir, "audio", `${h}.${TTS === "elevenlabs" ? "mp3" : "wav"}`);
+      if (!existsSync(raw)) {
+        if (TTS === "elevenlabs") {
+          const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
+            method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY || "proxy-injected", "Content-Type": "application/json" },
+            body: JSON.stringify({ text: ttsText(b), model_id: VOICE?.model ?? "eleven_multilingual_v2", voice_settings: VOICE?.settings,
+              previous_text: ALL[b.idx - 1]?.text, next_text: ALL[b.idx + 1]?.text }),
+          });
+          if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`);
+          writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
+        } else sh("python3", ["-m", "piper", "-m", voice, "-f", raw, ...VARIANTS[v]], { input: ttsText(b) });
+      }
+      const clean = join(outDir, "audio", `${h}.clean.wav`);
+      if (!existsSync(clean)) sh("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", VOICE_CHAIN, "-ar", "44100", "-ac", "1", clean]);
+      const words = align(clean, b.text, h + "c");
+      const meta = JSON.parse(readFileSync(join(outDir, "audio", `${h}c.words.json.meta.json`), "utf8"));
+      const score = meta.matched / Math.max(1, meta.total);
+      if (!best || score > best.score) best = { h, clean, words, score };
+      if (score >= 0.86) break; // clean take: transcription matches the script
+      regenerated++;
+    }
+    const paddedG = join(outDir, "audio", `${best.h}.gap${gap}.wav`);
+    if (!existsSync(paddedG)) sh("ffmpeg", ["-y", "-v", "error", "-i", best.clean, "-af", `apad=pad_dur=${gap}`, "-ar", "44100", "-ac", "1", paddedG]);
+    b.speech = dur(best.clean); b.dur = dur(paddedG); list.push(`file '${paddedG}'`);
+    b.words = best.words; b.voiceScore = best.score;
   }
+  const low = BEATS.filter((b) => b.voiceScore < 0.86).map((b) => `${b.idx}:${b.voiceScore.toFixed(2)}`);
+  console.log(`voice QA: ${regenerated} retakes; below threshold after retakes: ${low.join(" ") || "none"}`);
   writeFileSync(join(outDir, "audio/list.txt"), list.join("\n"));
   const joined = join(outDir, "narration-raw.wav");
   sh("ffmpeg", ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", join(outDir, "audio/list.txt"), "-c", "copy", joined]);
@@ -207,7 +223,7 @@ const ink = PALETTE.ink;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const PEOPLE_CACHE = {};
 const NO_BLINK = new Set(["calm", "strain", "blink"]);
-const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stand", "idea", "celebrate", "hustle"]);
+const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stand", "idea", "celebrate", "hustle", "coffee", "highFive", "giveGift", "listen", "sitBench"]);
 
 function placement(b, lt) {
   let x = b.x ?? (b.card && !VERTICAL ? 640 : W / 2);
@@ -219,12 +235,13 @@ function placement(b, lt) {
 for (const [i, b] of BEATS.entries()) {
   const n = Math.max(1, Math.round(b.dur / 2.1));
   const classroom = b.scene?.name === "classroom";
-  const thoughts = (b.items ?? []).some((it) => it.type === "thought");
+  const thoughts = (b.items ?? []).some((it) => it.type === "thought" || it.type === "say");
   const pool = classroom ? (VERTICAL ? ["board", "medium"] : ["wide", "push"])
     : thoughts && !VERTICAL ? ["wide", "push"]
     : (b.card && !VERTICAL) || b.items?.length ? ["wide", "medium"] : ["wide", "medium", "close"];
   const changed = i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b);
   b.shots = [];
+  if (b.cam) { b.shots.push({ type: b.cam.type ?? "custom", s: 0, e: b.dur, custom: b.cam }); continue; }
   for (let k = 0; k < n; k++) {
     let type = k === 0 && changed ? "wide" : pool[(b.idx * 2 + k * (b.idx % 2 ? 1 : 2)) % pool.length];
     if (k > 0 && type === b.shots[k - 1].type) type = pool[(pool.indexOf(type) + 1) % pool.length];
@@ -232,7 +249,16 @@ for (const [i, b] of BEATS.entries()) {
   }
 }
 
-function camera(type, prog, cx, py, pose, inOut) {
+function camera(type, prog, cx, py, pose, inOut, custom) {
+  if (custom) {
+    // crafted move: pan/zoom from -> to over the beat (world coords), eased
+    const e = ease(Math.min(1, prog)), f = custom.from ?? [cx, py - 90], g = custom.to ?? f;
+    const z = (custom.z0 ?? custom.z ?? 1.3) + ((custom.z1 ?? custom.z ?? 1.3) - (custom.z0 ?? custom.z ?? 1.3)) * e;
+    const s = BASE * z, vw = OW / s, vh = OH / s;
+    let fx = f[0] + (g[0] - f[0]) * e, fy = f[1] + (g[1] - f[1]) * e;
+    fx = Math.min(W - vw / 2, Math.max(vw / 2, fx)); fy = Math.min(H - vh / 2, Math.max(vh / 2, fy));
+    return { s, fx, fy, blur: z > 1.6 ? 3 : z > 1.2 ? 2 : 1.1 };
+  }
   const lying = pose === "lie" || pose === "lieAwake";
   const headX = lying ? cx - 150 * SCALE : cx, headY = lying ? py - 20 : py - 150 * SCALE;
   let z = 1, fx = VERTICAL ? (lying ? cx - 110 * SCALE : cx) : W / 2, fy = H / 2;
@@ -246,24 +272,32 @@ function camera(type, prog, cx, py, pose, inOut) {
   return { s, fx, fy, blur: type === "close" ? 3.2 : type === "medium" ? 2 : 1.1 };
 }
 
+const sceneIdx = new Map(); { let n = 0; BEATS.forEach((b, i) => { if (i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b)) sceneIdx.set(i, n++); }); }
 function frameSVG(t) {
   let i = BEATS.findIndex((b) => t < b.start + b.dur); if (i < 0) i = BEATS.length - 1;
   const b = BEATS[i], lt = t - b.start;
-  const tc = Math.floor(t * CFPS) / CFPS, ltc = Math.max(0, tc - b.start); // character time, on 2s
+  const tc = t, ltc = Math.max(0, lt); // continuous: every frame moves
   const pb = BEATS[Math.max(0, i - 1)];
   const sceneChanged = i > 0 && sceneKey(pb) !== sceneKey(b);
   const poseChanged = i > 0 && !sceneChanged && pb.pose !== b.pose;
   // pose snap: one in-between frame, then the key pose
   const lyingSwap = [pb.pose, b.pose].some((x) => x === "lie" || x === "lieAwake") && pb.pose !== b.pose;
-  const k = i === 0 || sceneChanged || lyingSwap ? 1 : ltc < 1 / CFPS ? 0.5 : 1;
+  // eased pose change with a little overshoot (follow-through), ~0.4 s
+  const q0 = Math.min(1, ltc / 0.42), c1 = 1.5, c3 = c1 + 1;
+  const k = i === 0 || sceneChanged || lyingSwap ? 1 : 1 + c3 * Math.pow(q0 - 1, 3) + c1 * Math.pow(q0 - 1, 2);
   const pose = lerpPose(resolved[Math.max(0, i - 1)], resolved[i], k);
   const anim = POSE_LIB[b.pose].anim;
   const ph = tc * 2 * Math.PI;
+  const speaking = ltc < b.speech, lv = speaking ? loud(tc) : 0;
   if (b.pose !== "lie" && b.pose !== "lieAwake") {
-    pose.lift += Math.sin(ph * 0.55) * 3;
-    pose.lean += Math.sin(tc * 1.3) * 1.2;
-    pose.headTilt += Math.sin(tc * 0.9 + 1) * 2;
-  }
+    pose.lift += Math.sin(ph * 0.55) * 3.5;
+    pose.lean += Math.sin(tc * 1.3) * 1.6 + Math.sin(tc * 0.37) * 1.2;
+    pose.headTilt += Math.sin(tc * 0.9 + 1) * 2.5 + lv * Math.sin(tc * 9) * 3.5; // head bobs with the voice
+    // breathing arms + small talking gestures
+    const g = speaking && TALKERS.has(b.pose) ? 1 : 0.35;
+    pose.armL = { ...pose.armL, a1: pose.armL.a1 + Math.sin(tc * 1.7) * 3 * g, a2: pose.armL.a2 + Math.sin(tc * 2.3 + 1) * 6 * g };
+    if (!pose.overHead) pose.armR = { ...pose.armR, a1: pose.armR.a1 + Math.sin(tc * 1.9 + 2) * 3 * g, a2: pose.armR.a2 + Math.sin(tc * 2.1 + 3) * 6 * g };
+  } else pose.lift += Math.sin(ph * 0.25) * 2; // sleeping breath
   if (b.pose === "wave") pose.armR = { ...pose.armR, a2: pose.armR.a2 + Math.sin(ph * 1.8) * 22, a1: pose.armR.a1 + Math.sin(ph * 1.8) * 6 };
   if (b.pose === "explain") pose.armR = { ...pose.armR, a2: pose.armR.a2 + Math.sin(ph * 0.8) * 7 };
   if (b.pose === "shrug") pose.lift += Math.max(0, Math.sin(ph * 0.9)) * 6;
@@ -275,6 +309,31 @@ function frameSVG(t) {
     pose.armR = { ...pose.armR, a2: pose.armR.a2 + Math.sin(ph * 4.2 + 2) * 10 };
   }
   if (b.look) pose.headTilt += Math.sin(ph * 0.45) * 16;
+  if (anim === "run") {
+    const w = Math.sin(ph * 2.6);
+    pose.legL = { ...pose.legL, a1: -6 + 40 * w, a2: -6 + 40 * w - Math.max(0, -w) * 55 };
+    pose.legR = { ...pose.legR, a1: 6 - 40 * w, a2: 6 - 40 * w - Math.max(0, w) * 55 };
+    pose.armL = { ...pose.armL, a1: -20 - 45 * w, a2: 60 - 30 * w };
+    pose.armR = { ...pose.armR, a1: 20 + 45 * w, a2: -60 + 30 * w };
+    pose.lift += Math.abs(Math.cos(ph * 2.6)) * 16;
+  }
+  if (anim === "dance") {
+    const w = Math.sin(ph * 2.2), w2 = Math.sin(ph * 1.1);
+    pose.lean += w2 * 10; pose.lift += Math.abs(w) * 14; pose.headTilt += w2 * 8;
+    pose.armL = { ...pose.armL, a1: -150 + 50 * w, a2: -170 + 40 * w };
+    pose.armR = { ...pose.armR, a1: 70 - 40 * w, a2: 30 - 50 * w };
+    pose.legL = { ...pose.legL, a1: -12 + 10 * w2, a2: -4 + 14 * Math.max(0, w) };
+    pose.legR = { ...pose.legR, a1: 12 + 10 * w2, a2: 4 - 14 * Math.max(0, -w) };
+  }
+  if (anim === "sneak") {
+    const w = Math.sin(ph * 0.9);
+    pose.lift += Math.abs(w) * 10; pose.lean += w * 3;
+    pose.legR = { ...pose.legR, a1: pose.legR.a1 + w * 10 };
+  }
+  if (POSE_LIB[b.pose].sit && anim !== "type") {
+    pose.legL = { ...pose.legL, a2: pose.legL.a2 + Math.sin(ph * 0.8) * 8 };
+    pose.legR = { ...pose.legR, a2: pose.legR.a2 - Math.sin(ph * 0.8 + 1) * 8 };
+  }
   if (anim === "walk") {
     const w = Math.sin(ph * 1.7);
     pose.legL = { ...pose.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 };
@@ -286,12 +345,11 @@ function frameSVG(t) {
   const blinking = !NO_BLINK.has(pose.expr) && ((tc + i * 0.7) % 3.4) < 0.13;
   if (blinking) pose.expr = "blink";
   // lip flaps while the narrator speaks
-  if (TALKERS.has(b.pose) && !blinking && ltc < b.speech) { const l = loud(tc); pose.mouth = l > 0.55 ? 2 : l > 0.2 ? 1 : 0; }
+  if (TALKERS.has(b.pose) && !blinking && speaking) pose.mouth = lv > 0.55 ? 2 : lv > 0.2 ? 1 : 0;
 
   // squash & stretch on a pose snap (character frames 0..3)
-  const fr = Math.floor(ltc * CFPS);
-  const SQ = [[1.08, 0.88], [0.95, 1.07], [1.02, 0.98]];
-  const [sx, sy] = poseChanged && fr < 3 ? SQ[fr] : [1, 1];
+  const qs = Math.min(1, ltc / 0.36);
+  const sy = poseChanged && qs < 1 ? 1 - 0.11 * Math.sin(qs * 2 * Math.PI) * (1 - qs) : 1, sx = 1 / Math.sqrt(sy);
 
   const [x1, y1] = placement(b, lt);
   const [x0, y0] = sceneChanged ? [x1, y1] : placement(pb, pb.dur);
@@ -301,9 +359,11 @@ function frameSVG(t) {
   // world layers
   const sc = b.scene ? SCENES[b.scene.name](b.scene, tc) : SCENES.studio({}, tc);
   const shot = b.shots.find((s) => lt < s.e) ?? b.shots[b.shots.length - 1];
-  const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0);
+  const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0, shot.custom);
+  // handheld drift: the camera is never perfectly still
+  cam.fx += Math.sin(t * 0.61) * 7 + Math.sin(t * 1.73) * 2.5; cam.fy += Math.cos(t * 0.47) * 5 + Math.sin(t * 1.31) * 2;
   // vertical: pan to whoever's thought just popped up (the bubbles are the story)
-  const tItems = (b.items ?? []).filter((it) => it.type === "thought" && it.delay !== undefined);
+  const tItems = (b.items ?? []).filter((it) => (it.type === "thought" || it.type === "say") && it.delay !== undefined);
   if (VERTICAL && tItems.length) {
     const shown = tItems.filter((it) => lt >= it.delay);
     const tgt = (k) => (k < 0 ? cx : tItems[k].x);
@@ -318,11 +378,28 @@ function frameSVG(t) {
   for (const [pi, pp] of (b.people ?? []).entries()) {
     const key = JSON.stringify(pp);
     const base = (PEOPLE_CACHE[key] ??= resolvePose({ ...POSE_LIB[pp.pose ?? "stand"], ...(pp.expr ? { expr: pp.expr } : {}), acc: pp.acc }));
-    const q = { ...base, lift: base.lift + Math.sin((tc + pi) * 2 * Math.PI * 0.5) * 3, headTilt: base.headTilt + Math.sin(tc * 0.8 + pi * 2) * 3 };
+    const q = { ...base, lift: base.lift + Math.sin((tc + pi) * 2 * Math.PI * 0.5) * 3, headTilt: base.headTilt + Math.sin(tc * 0.8 + pi * 2) * 4,
+      lean: base.lean + Math.sin(tc * 1.1 + pi) * 1.5 };
+    const pph = (tc + pi * 0.37) * 2 * Math.PI, pa = pp.anim ?? POSE_LIB[pp.pose ?? "stand"].anim;
+    q.armL = { ...q.armL, a2: q.armL.a2 + Math.sin(tc * 2 + pi) * 6 }; q.armR = { ...q.armR, a2: q.armR.a2 + Math.sin(tc * 2.2 + pi * 2) * 6 };
+    if (pa === "walk" || pp.walk) {
+      const w = Math.sin(pph * 1.7);
+      q.legL = { ...q.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 }; q.legR = { ...q.legR, a1: 4 - 26 * w, a2: 4 - 26 * w - Math.max(0, w) * 30 };
+      q.armL = { ...q.armL, a1: -12 - 22 * w, a2: -6 - 30 * w }; q.armR = { ...q.armR, a1: 12 + 22 * w, a2: 6 + 30 * w };
+      q.lift += Math.abs(Math.cos(pph * 1.7)) * 6;
+    }
+    if (pa === "dance") {
+      const w = Math.sin(pph * 2.2 + pi), w2 = Math.sin(pph * 1.1 + pi);
+      q.lean += w2 * 10; q.lift += Math.abs(w) * 14;
+      q.armL = { ...q.armL, a1: -150 + 50 * w, a2: -170 + 40 * w }; q.armR = { ...q.armR, a1: 150 - 50 * w, a2: 170 - 40 * w };
+    }
+    if (pa === "talk") { q.armR = { ...q.armR, a1: 60 + Math.sin(pph * 1.3) * 25, a2: 30 + Math.sin(pph * 1.9) * 30 }; q.mouth = Math.sin(pph * 3) > 0.2 ? 1 : 0; }
+    if (pp.anim === "wave") q.armR = { ...q.armR, a1: 150, a2: 175 + Math.sin(pph * 1.8) * 22 };
     if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
-    const ps = SCALE * (pp.s ?? 0.92), ppy = GROUND - (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130) * ps;
-    world += `<ellipse cx="${pp.x}" cy="${GROUND + 4}" rx="${90 * (pp.s ?? 0.92)}" ry="10" fill="rgba(0,0,0,0.12)"/>`;
-    world += `<g transform="translate(${pp.x},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g>`;
+    const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130) * ps;
+    const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
+    world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 4}" rx="${90 * (pp.s ?? 0.92)}" ry="10" fill="rgba(0,0,0,0.12)"/>`;
+    world += `<g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g>`;
   }
   for (const it of b.items ?? []) {
     if (it.delay && lt < it.delay) continue;
@@ -337,7 +414,16 @@ function frameSVG(t) {
   // screen shake on impacts (first ~6 frames)
   const shakeOn = ["shocked", "scared", "panic"].includes(b.pose) && lt < 0.22;
   const jx = shakeOn ? Math.sin(t * 157) * 14 : 0, jy = shakeOn ? Math.cos(t * 131) * 10 : 0;
-  let s = `<g transform="translate(${OW / 2 + jx},${OH / 2 + jy}) scale(${cam.s.toFixed(4)}) translate(${-cam.fx},${-cam.fy})">${world}</g>`;
+  // scene transitions: flash / whip-pan / iris / slide, rotating through the episode
+  let tx = 0, wrapOpen = "", wrapClose = "", trFilter = "";
+  if (sceneChanged && lt < 0.4) {
+    const style = b.transition ?? ["whip", "iris", "slide", "flash"][(sceneIdx.get(i) ?? 0) % 4], e = ease(Math.min(1, lt / 0.35));
+    if (style === "whip") { tx = (1 - e) * OW * 0.9 * (i % 2 ? 1 : -1); trFilter = `<filter id="whip" x="-20%" y="0" width="140%" height="100%"><feGaussianBlur stdDeviation="${(1 - e) * 60} 0"/></filter>`; wrapOpen = `<g filter="url(#whip)">`; wrapClose = "</g>"; }
+    if (style === "slide") tx = (1 - e) * OW * (i % 2 ? -1 : 1);
+    if (style === "iris") { trFilter = `<clipPath id="iris"><circle cx="${OW / 2}" cy="${OH / 2}" r="${e * Math.hypot(OW, OH) * 0.6}"/></clipPath>`; wrapOpen = `<rect width="${OW}" height="${OH}" fill="#000"/><g clip-path="url(#iris)">`; wrapClose = "</g>"; }
+    if (style === "flash") wrapClose = `<rect width="${OW}" height="${OH}" fill="#fff" opacity="${(1 - Math.min(1, lt / 0.12)).toFixed(3)}"/>`;
+  }
+  let s = `${wrapOpen}<g transform="translate(${OW / 2 + jx + tx},${OH / 2 + jy}) scale(${cam.s.toFixed(4)}) translate(${-cam.fx},${-cam.fy})">${world}</g>${wrapClose}`;
   s += `<rect width="${OW}" height="${OH}" fill="url(#vig)"/>`;
 
   // HUD -------------------------------------------------------------
@@ -368,11 +454,11 @@ function frameSVG(t) {
     s += `<g transform="translate(${OW / 2},${cy}) scale(${pop.toFixed(3)})"><text x="0" y="0" text-anchor="middle" font-size="${fs}" fill="#fff" stroke="#000" stroke-width="${fs * 0.2}" stroke-linejoin="round" paint-order="stroke" style="${M}">${esc(ch.text)}</text></g>`;
   }
   if (b.blackout && lt > 1.6 && lt < 2.5) s += `<rect width="${OW}" height="${OH}" fill="#000"/>`;
-  if (sceneChanged && lt < 0.1) s += `<rect width="${OW}" height="${OH}" fill="#fff" opacity="${(1 - lt / 0.1).toFixed(3)}"/>`;
+
   const fade = Math.min(1, t / 0.4, (TOTAL - t) / 0.8);
   if (fade < 1) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${(1 - Math.max(0, fade)).toFixed(3)}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}" viewBox="0 0 ${OW} ${OH}"><defs>
-    <filter id="dof" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${cam.blur}"/></filter>
+    <filter id="dof" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${cam.blur}"/></filter>${trFilter}
     <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient>
     </defs>${s}</svg>`;
 }

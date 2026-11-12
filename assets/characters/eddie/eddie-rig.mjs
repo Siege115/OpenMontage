@@ -217,6 +217,15 @@ export const PROPS = {
       <circle cx="${tail * w * 0.4}" cy="${h / 2 + 52}" r="7" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>` +
       lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="38" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
   },
+  say: (o, a = {}) => {
+    const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
+    const w = Math.max(...lines.map((l) => l.length)) * 20 + 60, h = lines.length * 46 + 34;
+    return `<g transform="translate(${o[0]},${o[1]})">
+      <path d="M${tail * w * 0.18},${h / 2 - 2} L${tail * w * 0.3},${h / 2 + 40} L${tail * w * 0.02},${h / 2 - 2} Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+      <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="22" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
+      <path d="M${tail * w * 0.18 + 4 * tail},${h / 2 - 3} L${tail * w * 0.04},${h / 2 - 3}" stroke="${P.paper}" stroke-width="8"/>` +
+      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 46 + 14}" text-anchor="middle" font-size="40" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
+  },
   // ---- scene props (o = position relative to the pelvis) ----
   zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
     <text x="${o[0]}" y="${o[1]}" font-size="30">z</text><text x="${o[0] + 18}" y="${o[1] - 22}" font-size="40">z</text>
@@ -287,9 +296,24 @@ export function character(pose) {
   g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr, pose.mouth ?? 0, pose.acc)}</g>`;
   if (pose.overHead) g += arm(S, pose.overHead);
   if (pose.frontArms) g += arm(S, armL) + arm(S, armR);
+  for (const [side, spec] of [["holdL", armL], ["holdR", pose.overHead ?? armR]]) {
+    if (!pose[side]) continue;
+    const [E, W] = limb(S, spec, LEN.upper, LEN.fore);
+    const hand = add(W, dir(angleOf(E, W)), 6);
+    g += `<g transform="translate(${pt(hand)})">${HELD[pose[side]] ?? ""}</g>`;
+  }
   for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);
   return `<g transform="translate(0,${-(pose.lift ?? 0)})">${g}</g>`;
 }
+
+// Objects held in a hand (drawn centred on the hand, on top of it).
+const HELD = {
+  phone: `<rect x="-9" y="-30" width="20" height="36" rx="4" fill="#2b2f3a" stroke="${P.ink}" stroke-width="3"/><rect x="-6" y="-26" width="14" height="24" rx="2" fill="#9cd0ff"/>`,
+  coffee: `<path d="M-11,-22 L11,-22 L8,4 L-8,4 Z" fill="#fff" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><rect x="-13" y="-27" width="26" height="6" rx="2" fill="#c98a5f" stroke="${P.ink}" stroke-width="3"/><rect x="-10" y="-14" width="20" height="8" fill="#c98a5f"/>`,
+  bag: `<path d="M-16,4 L16,4 L20,40 L-20,40 Z" fill="#e9a8a0" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><path d="M-8,4 Q0,-10 8,4" fill="none" stroke="${P.ink}" stroke-width="3"/>`,
+  gift: `<rect x="-18" y="-30" width="36" height="32" fill="#9cc3e6" stroke="${P.ink}" stroke-width="3"/><path d="M0,-30 L0,2 M-18,-16 L18,-16" stroke="#e5584f" stroke-width="5"/><path d="M0,-30 Q-12,-44 -4,-32 M0,-30 Q12,-44 4,-32" fill="none" stroke="#e5584f" stroke-width="3"/>`,
+  mic: `<rect x="-4" y="-6" width="8" height="26" rx="3" fill="#2b2f3a" stroke="${P.ink}" stroke-width="2"/><circle cx="0" cy="-12" r="9" fill="#9aa0ad" stroke="${P.ink}" stroke-width="3"/>`,
+};
 
 // Resolve every limb of a pose into absolute {a1, a2} angles, so two poses can be
 // interpolated joint-by-joint (see lerpPose).
@@ -419,6 +443,43 @@ export const POSES = {
     props: [{ type: "zzz", at: [-180, -140] }],
   },
   walk: { label: "Walking", expr: "neutral", anim: "walk" },
+  run: { label: "Running", expr: "scared", anim: "run", lean: 14 },
+  dance: { label: "Dancing", expr: "happy", anim: "dance" },
+  coverEars: {
+    label: "Too loud", expr: "strain", frontArms: true, anim: "panic",
+    armL: { target: [-56, -140], bend: -1 }, armR: { target: [56, -140], bend: 1 },
+    legL: { a1: -14, a2: -6 }, legR: { a1: 12, a2: 8 },
+  },
+  listen: {
+    label: "Listening", expr: "focused", headTilt: -10,
+    overHead: { target: [58, -146], bend: 1, thumb: 200 }, armL: { a1: -12, a2: -4 },
+  },
+  sitBench: {
+    label: "Sitting", expr: "calm", sit: true,
+    legL: { a1: -60, a2: 6 }, legR: { a1: 60, a2: -6 },
+    armL: { target: [-46, -6], bend: -1 }, armR: { target: [46, -6], bend: 1 },
+  },
+  phone: {
+    label: "Phone", expr: "focused", headTilt: 10,
+    armR: { target: [26, -96], bend: 1 }, armL: { target: [10, -70], bend: -1 }, holdR: "phone",
+  },
+  coffee: {
+    label: "Coffee", expr: "happy",
+    armR: { target: [44, -64], bend: 1 }, armL: { a1: -12, a2: -4 }, holdR: "coffee",
+  },
+  highFive: {
+    label: "High five", expr: "happy", lean: 6,
+    armR: { a1: 118, a2: 132 }, armL: { a1: -18, a2: -8 },
+  },
+  sneak: {
+    label: "Sneaking", expr: "focused", lean: 10, anim: "sneak",
+    armL: { target: [-56, -96], bend: -1 }, armR: { target: [64, -100], bend: 1 },
+    legL: { a1: -16, a2: -4 }, legR: { a1: 34, a2: -8 },
+  },
+  giveGift: {
+    label: "Gift", expr: "happy", lean: 4,
+    armR: { a1: 80, a2: 70 }, armL: { target: [40, -40], bend: 1 }, holdR: "gift",
+  },
   lieAwake: {
     label: "Awake in bed", expr: "neutral", lean: -90, headTilt: 72,
     armL: { a1: 90, a2: 92 }, armR: { a1: 92, a2: 94 },
