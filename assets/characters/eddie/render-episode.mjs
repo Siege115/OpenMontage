@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { character, resolvePose, lerpPose, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
+import { character, head, resolvePose, lerpPose, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
 import { SCENES as BASE_SCENES } from "./scenes.mjs";
 import { EXTRA_SCENES } from "./scenes-extra.mjs";
 import { EASE, spring, seg, life, keys, stagger, lerp } from "./motion.mjs";
@@ -227,7 +227,8 @@ if (SFX_AVAILABLE) {
     const act = { celebrate: ["celebration-popper", 0.15], idea: ["shimmer-short-bright", 0.1], highFive: ["click-clap-firm", 0.4], type: ["keyboard-typing-steady-medium", 0.2],
       phone: ["phone-vibrate-hand", 0.5], coffee: ["foley-glass-touch", 0.35], read: ["props-page-turn", 0.4], giveGift: ["props-box-open", 0.45], sneak: ["foley-fabric-slide", 0.2], dance: ["move-bounce", 0.2] }[b.pose];
     if (act && BEATS[i - 1]?.pose !== b.pose) cue(act[0], t0 + act[1], -3);
-    if (b.riser) cue("riser-2s-soft", t0 + b.riser);                    // arrival at the reveal
+    if (b.riser) cue("riser-2s-soft", t0 + b.riser);
+    if (b.quiz) { b.quiz.options.forEach((_, j) => cue("pop-medium-in", t0 + (b.quiz.at?.[j] ?? 0.9 + j * 0.7) + 0.05, -2)); cue("time-clock-fast", t0 + 2.6, -6); cue("notification-success-chime", t0 + b.dur - 1.15, -1); }                    // arrival at the reveal
   });
   const speech = BEATS.map((b) => [b.start, b.start + b.speech]);
   const placed = mixCues(mix, cues, speech, 10 ** (-2 / 20));
@@ -237,14 +238,24 @@ if (SFX_AVAILABLE) {
 }
 const music = new Float32Array(mix.length);
 if (!args.includes("--no-music")) {
-  // soft pad: Cmaj7 / Am7 / Fmaj7 / G6, 4 s each, gentle swell
-  const chords = [[261.63, 329.63, 392, 493.88], [220, 261.63, 329.63, 392], [174.61, 220, 261.63, 329.63], [196, 246.94, 293.66, 329.63]];
-  for (let n = 0; n < mix.length; n++) {
-    const t = n / 44100, c = chords[Math.floor(t / 4) % 4], lt = t % 4;
-    const envA = Math.min(1, lt / 0.8) * Math.min(1, (4 - lt) / 0.8);
-    let v = 0; for (const fq of c) v += Math.sin(2 * Math.PI * fq * t) + 0.3 * Math.sin(2 * Math.PI * fq * 2 * t);
-    v += 0.8 * Math.sin(2 * Math.PI * (c[0] / 2) * t);
-    music[n] += v * 0.012 * envA * (0.85 + 0.15 * Math.sin(2 * Math.PI * 0.2 * t)) * Math.min(1, t / 2, (TOTAL - t) / 2);
+  // lively lo-fi bed, 90 BPM: kick / snare / swung hats + warm 7th chords + bass (ducked under the voice later)
+  const BPM = 90, beat = 60 / BPM, R = 44100;
+  const chords = [[220, 261.63, 329.63, 392], [174.61, 220, 261.63, 329.63], [130.81, 164.81, 196, 246.94], [196, 246.94, 293.66, 349.23]]; // Am7 Fmaj7 Cmaj7 G7
+  let seed = 1; const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff) * 2 - 1;
+  for (let n = 0; n < music.length; n++) {
+    const t = n / R, bt = t / beat, bar = Math.floor(bt / 4), pb = bt % 4, c = chords[bar % 4];
+    const fadeIO = Math.min(1, t / 2, (TOTAL - t) / 2.5);
+    // chords: soft electric-piano-ish (sine + octave), re-struck every 2 beats with decay
+    const ct = (bt % 2) * beat; let v = 0;
+    for (const fq of c) v += (Math.sin(2 * Math.PI * fq * t) + 0.25 * Math.sin(4 * Math.PI * fq * t)) * Math.exp(-ct * 1.6);
+    v *= 0.11 * (0.9 + 0.1 * Math.sin(2 * Math.PI * 5 * t));
+    // bass: root on beats 1 and 3
+    const bph = (bt % 2) * beat; v += 0.32 * Math.sin(2 * Math.PI * (c[0] / 2) * t) * Math.exp(-bph * 2.2);
+    // kick on 1 and 3, snare on 2 and 4, swung 8th hats
+    const kt = (bt % 2) * beat; v += 0.55 * Math.sin(2 * Math.PI * (50 + 90 * Math.exp(-kt * 30)) * kt) * Math.exp(-kt * 9);
+    const st = ((bt + 1) % 2) * beat; v += (0.22 * rnd() + 0.12 * Math.sin(2 * Math.PI * 190 * st)) * Math.exp(-st * 18);
+    const e8 = (bt * 2) % 1, sw = Math.floor(bt * 2) % 2 ? 0.08 : 0, ht = (e8 - sw) * beat / 2; if (ht > 0) v += 0.07 * rnd() * Math.exp(-ht * 70);
+    music[n] += v * 0.1 * fadeIO;
   }
 }
 function writeWav(arr, path) {
@@ -277,7 +288,7 @@ const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stan
 function placement(b, lt) {
   let x = b.x ?? (b.card && !VERTICAL ? 640 : W / 2);
   if (b.walk) x = b.walk[0] + (b.walk[1] - b.walk[0]) * Math.min(1, lt / b.dur);
-  const y = b.y ?? (GROUND - (POSE_LIB[b.pose].sit ? 58 : 130) * SCALE);
+  const lib = POSE_LIB[b.pose], y = b.y ?? (GROUND - (lib.sitH ?? (lib.sit ? 58 : 130)) * SCALE);
   return [x, y];
 }
 // shot list per beat: ~2 s shots, cycling framings, wide first after a scene change
@@ -326,6 +337,8 @@ function camera(type, prog, cx, py, pose, inOut, custom) {
   return { s, fx, fy, blur: type === "close" ? 3.2 : type === "medium" ? 2 : 1.1 };
 }
 
+const DAYS = []; BEATS.forEach((b, i) => { if (b.day && b.day !== "-") DAYS.push({ label: b.day.replace("DAY ", "D"), start: b.start }); else if (b.day === "-" && DAYS.length && !DAYS.endMark) { DAYS.endMark = true; DAYS[DAYS.length - 1].end = b.start; } });
+if (DAYS.length) DAYS[DAYS.length - 1].end ??= TOTAL;
 const sceneIdx = new Map(); { let n = 0; BEATS.forEach((b, i) => { if (i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b)) sceneIdx.set(i, n++); }); }
 function frameSVG(t) {
   let i = BEATS.findIndex((b) => t < b.start + b.dur); if (i < 0) i = BEATS.length - 1;
@@ -462,7 +475,7 @@ function frameSVG(t) {
     if (pa === "talk") { q.armR = { ...q.armR, a1: 60 + Math.sin(pph * 1.3) * 25, a2: 30 + Math.sin(pph * 1.9) * 30 }; q.mouth = Math.sin(pph * 3) > 0.2 ? 1 : 0; }
     if (pp.anim === "wave") q.armR = { ...q.armR, a1: 150, a2: 175 + Math.sin(pph * 1.8) * 22 };
     if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
-    const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130) * ps;
+    const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sitH ?? (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130)) * ps;
     const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
     world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
     world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
@@ -484,6 +497,14 @@ function frameSVG(t) {
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
   const footY = POSE_LIB[b.pose].sit ? py : GROUND;
   world += `<g filter="${lightF}"><g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g></g>`;
+  // reaction pops: picked from Eddie's expression / pose, spring in near his head
+  const emoteKind = b.emote ?? ({ shocked: "bang", scared: "sweat", strain: "sweat", wrecked: "sweat", thinking: "q", angry: "anger" }[curR.expr]
+    ?? ({ think: "q", panic: "sweat", coverEars: "sweat", celebrate: "spark", idea: "spark", highFive: "spark", dance: "heart" }[b.pose]));
+  if (emoteKind && b.pose !== "lie" && b.pose !== "lieAwake" && lt < 2.6) {
+    const sp = spring(lt - 0.12, { stiffness: 300, damping: 12 }), fade = 1 - seg(lt, 2.2, 0.35, EASE.power2.in);
+    const hx = cx + (b.pose === "think" ? 115 : 92) * (SCALE / 1.85), hy = py - (pose.lift ?? 0) * SCALE - 300 * (SCALE / 1.85) + Math.sin(t * 3) * 6;
+    world += `<g opacity="${fade.toFixed(3)}" transform="translate(${hx.toFixed(1)},${hy.toFixed(1)}) scale(${(1.5 * sp).toFixed(3)})">${PROPS.emote([0, 0], { kind: emoteKind })}</g>`;
+  }
   world += sc.fg;
   world += drawItems(true); // speech/thought bubbles always on top
   if (b.blanket) world += `<path d="M330,640 Q520,600 700,650 L700,800 Q480,820 300,800 Z" fill="#7fa7d9" stroke="${ink}" stroke-width="5" stroke-linejoin="round"/><path d="M340,680 Q520,650 690,690" fill="none" stroke="#6a92c6" stroke-width="5"/>`;
@@ -541,9 +562,35 @@ function frameSVG(t) {
     for (const w of ch.words) {
       const ww = (WIDTH[w.w] ?? w.w.length * 70) * k, q = seg(lt, w.s - 0.07, 0.2, EASE.power3.out);
       const active = lt >= w.s - 0.02 && lt <= w.e + 0.06, sc = (0.86 + 0.14 * EASE.back.out(q)) * (active ? 1.06 : 1);
-      if (q > 0) s += `<g transform="translate(${(x + ww / 2).toFixed(1)},${(cy + (1 - q) * 30).toFixed(1)}) scale(${sc.toFixed(3)})" opacity="${q.toFixed(3)}"><text x="0" y="0" text-anchor="middle" font-size="${fs.toFixed(1)}" fill="${active ? "#ffd84d" : "#fff"}" stroke="#000" stroke-width="${(fs * 0.2).toFixed(1)}" stroke-linejoin="round" paint-order="stroke" style="${M}">${esc(w.w)}</text></g>`;
+      if (q > 0) s += `<g transform="translate(${(x + ww / 2).toFixed(1)},${(cy + (1 - q) * 30).toFixed(1)}) scale(${sc.toFixed(3)})" opacity="${q.toFixed(3)}"><text x="0" y="0" text-anchor="middle" font-size="${fs.toFixed(1)}" fill="${/\d|thousand|hundred|percent|half|quarter/i.test(w.w) ? "#7CFF8B" : active ? "#ffd84d" : "#fff"}" stroke="#000" stroke-width="${(fs * 0.2).toFixed(1)}" stroke-linejoin="round" paint-order="stroke" style="${M}">${esc(w.w)}</text></g>`;
       x += ww + SPACE * k;
     }
+  }
+  // journey progress bar (Day 1 -> Day 30): a reason to keep watching
+  if (DAYS.length && t >= DAYS[0].start - 0.2) {
+    const endT = DAYS[DAYS.length - 1].end, a = seg(t, DAYS[0].start - 0.2, 0.45, EASE.power3.out) * (1 - seg(t, endT, 0.4, EASE.power2.in));
+    if (a > 0) {
+      const bw = VERTICAL ? 700 : 760, bx = OW / 2 - bw / 2, by = VERTICAL ? 70 : 34;
+      let cur = 0; DAYS.forEach((d, j) => { if (t >= d.start) cur = j; });
+      const nextD = DAYS[cur + 1], f = nextD ? seg(t, nextD.start - 0.6, 0.6, EASE.standard) : 0;
+      const px = bx + bw * ((cur + f) / (DAYS.length - 1));
+      s += `<g opacity="${a.toFixed(3)}"><rect x="${bx - 4}" y="${by - 4}" width="${bw + 8}" height="22" rx="11" fill="rgba(0,0,0,.35)"/><rect x="${bx}" y="${by}" width="${bw}" height="14" rx="7" fill="#fff"/><rect x="${bx}" y="${by}" width="${Math.max(0, px - bx).toFixed(1)}" height="14" rx="7" fill="#ff5a4a"/>` +
+        DAYS.map((d, j) => { const x = bx + bw * (j / (DAYS.length - 1)), done = j <= cur; return `<circle cx="${x}" cy="${by + 7}" r="11" fill="${done ? "#ff5a4a" : "#fff"}" stroke="#000" stroke-width="4"/><text x="${x}" y="${by + 46}" text-anchor="middle" font-size="22" fill="#fff" stroke="#000" stroke-width="5" paint-order="stroke" style="${M}">${d.label}</text>`; }).join("") +
+        `<g transform="translate(${px.toFixed(1)},${by + 7}) scale(0.42)">${head("happy")}</g></g>`;
+    }
+  }
+  // quiz: three options pop in one by one, a clock ticks, the answer lights up green at the end
+  if (b.quiz) {
+    const qz = b.quiz, cyq = VERTICAL ? 520 : 300, w = VERTICAL ? 300 : 340, gap = 30, x0 = OW / 2 - (3 * w + 2 * gap) / 2;
+    const reveal = lt >= b.dur - 1.2, qa = seg(lt, 0.1, 0.35, EASE.back.out);
+    s += `<g transform="translate(${OW / 2},${cyq - 120}) scale(${qa.toFixed(3)})"><rect x="-330" y="-48" width="660" height="88" rx="44" fill="#1b1b22" stroke="#000" stroke-width="5"/><text x="0" y="16" text-anchor="middle" font-size="46" fill="#fff" style="${M}">${esc(qz.q)}</text></g>`;
+    qz.options.forEach((o, j) => {
+      const t0q = qz.at?.[j] ?? 0.9 + j * 0.7, sp = spring(lt - t0q, { stiffness: 280, damping: 14 }), right = reveal && j === qz.answer, wrong = reveal && j !== qz.answer;
+      if (sp <= 0) return;
+      s += `<g transform="translate(${x0 + j * (w + gap) + w / 2},${cyq}) scale(${(sp * (right ? 1.1 : 1)).toFixed(3)})" opacity="${wrong ? 0.45 : 1}"><rect x="${-w / 2 + 6}" y="-44" width="${w}" height="96" rx="24" fill="rgba(0,0,0,.25)"/><rect x="${-w / 2}" y="-50" width="${w}" height="96" rx="24" fill="${right ? "#7CFF8B" : "#fff"}" stroke="#000" stroke-width="6"/>
+        <circle cx="${-w / 2 + 44}" cy="-2" r="26" fill="${["#ff5a4a", "#5b8fd9", "#ffd84d"][j]}" stroke="#000" stroke-width="4"/><text x="${-w / 2 + 44}" y="12" text-anchor="middle" font-size="36" fill="#fff" stroke="#000" stroke-width="5" paint-order="stroke" style="${M}">${"ABC"[j]}</text>
+        <text x="${22}" y="14" text-anchor="middle" font-size="44" fill="#000" style="${M}">${esc(o)}</text></g>`;
+    });
   }
   if (b.blackout && lt > 1.6 && lt < 2.5) s += `<rect width="${OW}" height="${OH}" fill="#000"/>`;
 

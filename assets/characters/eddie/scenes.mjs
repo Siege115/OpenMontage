@@ -134,25 +134,29 @@ export const SCENES = {
       for (let i = 0; i < 26; i++) { const tw = 0.5 + 0.5 * Math.sin(t * 1.7 + i * 2.1); bg += `<circle cx="${(i * 173) % W}" cy="${40 + ((i * 89) % 300)}" r="${1.5 + tw * 2}" fill="#fff" opacity="${0.4 + tw * 0.6}"/>`; }
       bg += `<circle cx="1640" cy="140" r="60" fill="#f6f1d8" ${o(4)}/><circle cx="1620" cy="125" r="10" fill="#e6dfbf"/><circle cx="1660" cy="160" r="7" fill="#e6dfbf"/>`;
     }
+    const HB = FLOOR - 70; // houses sit back behind the car lane
     const house = (x, w, h, col, lit) => {
-      let s = `<rect x="${x}" y="${FLOOR - h}" width="${w}" height="${h}" fill="${col}" ${o(5)}/><path d="M${x - 20},${FLOOR - h} L${x + w / 2},${FLOOR - h - 110} L${x + w + 20},${FLOOR - h} Z" fill="#5a4a5e" ${o(5)}/>`;
+      let s = `<rect x="${x}" y="${HB - h}" width="${w}" height="${h}" fill="${col}" ${o(5)}/><path d="M${x - 20},${HB - h} L${x + w / 2},${HB - h - 110} L${x + w + 20},${HB - h} Z" fill="#5a4a5e" ${o(5)}/>`;
       for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
         const on = lit && r === 0 && c === 1;
-        s += `<rect x="${x + 30 + c * (w - 120)}" y="${FLOOR - h + 40 + r * 110}" width="60" height="70" fill="${day ? "#cfe9f7" : on ? "#ffe39a" : "#2d3554"}" ${o(4)}/>`;
+        s += `<rect x="${x + 30 + c * (w - 120)}" y="${HB - h + 40 + r * 110}" width="60" height="70" fill="${day ? "#cfe9f7" : on ? "#ffe39a" : "#2d3554"}" ${o(4)}/>`;
       }
-      return s + `<rect x="${x + w / 2 - 30}" y="${FLOOR - 120}" width="60" height="120" fill="#6b5a4a" ${o(4)}/>`;
+      return s + `<rect x="${x + w / 2 - 30}" y="${HB - 120}" width="60" height="120" fill="#6b5a4a" ${o(4)}/>`;
     };
     bg += house(60, 360, 300, "#8a7fa8", false) + house(520, 300, 260, "#7f9cb0", false) + house(1330, 360, 320, "#a88f7f", true) + house(1740, 260, 250, "#7fa895", false);
     if (!day) bg += glow(1390 + 120, 250, 140, "#ffe39a", 0.35);
     // street lamp
     bg += `<path d="M1080,${FLOOR} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="${day ? "#eee" : "#ffe39a"}" ${o(4)}/>` + (day ? "" : glow(1170, 450, 330, "#ffe39a", 0.4));
+    // back lane with cars at believable scale (behind the characters, never in front of them)
+    bg += `<rect x="0" y="${HB}" width="${W}" height="${FLOOR - HB}" fill="${day ? "#7d828f" : "#454a58"}"/><path d="M0,${HB} L${W},${HB}" ${o(4)}/>`;
+    for (const [i, [spd, col]] of [[260, "#e5584f"], [-190, "#5b8fd9"]].entries()) {
+      const x = ((t * spd + i * 1500) % 3400 + 3400) % 3400 - 700, d = spd > 0 ? 1 : -1, k = 2.3;
+      bg += `<g transform="translate(${x},${FLOOR - 14 - i * 10}) scale(${d * k},${k})"><path d="M-150,40 L-150,-10 Q-130,-30 -60,-34 L-20,-80 Q20,-92 90,-86 Q120,-80 140,-34 L170,-30 Q190,-20 190,10 L190,40 Z" fill="${col}" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M-10,-40 L20,-76 Q50,-82 80,-78 L110,-40 Z" fill="#cfe9f7" stroke="${INK}" stroke-width="1.6"/><path d="M48,-80 L48,-40" stroke="${INK}" stroke-width="1.6"/>
+        <rect x="176" y="-14" width="14" height="10" rx="3" fill="${day ? "#fff6c8" : "#ffe39a"}" stroke="${INK}" stroke-width="1.2"/><circle cx="-80" cy="40" r="26" fill="#2b2f3a" stroke="${INK}" stroke-width="2.4"/><circle cx="-80" cy="40" r="10" fill="#9aa0ad"/><circle cx="120" cy="40" r="26" fill="#2b2f3a" stroke="${INK}" stroke-width="2.4"/><circle cx="120" cy="40" r="10" fill="#9aa0ad"/></g>`;
+    }
     bg += `<rect x="0" y="${FLOOR}" width="${W}" height="70" fill="#9aa0ad"/><path d="M0,${FLOOR} L${W},${FLOOR} M0,${FLOOR + 70} L${W},${FLOOR + 70}" ${o(5)}/><rect x="0" y="${FLOOR + 70}" width="${W}" height="200" fill="#4b4f5c"/>`;
     for (let x = 40; x < W; x += 260) bg += `<rect x="${x}" y="${FLOOR + 140}" width="140" height="14" rx="6" fill="#e8e3c8"/>`;
-    // passing cars
-    for (const [i, [spd, col]] of [[520, "#e5584f"], [-380, "#5b8fd9"]].entries()) {
-      const x = ((t * spd + i * 1300) % 2900 + 2900) % 2900 - 500, y = FLOOR + 30 + i * 90, d = spd > 0 ? 1 : -1;
-      bg += `<g transform="translate(${x},${y}) scale(${d * 0.8},0.8)"><path d="M-150,40 L-150,-10 Q-130,-30 -60,-34 L-20,-80 Q20,-92 90,-86 Q120,-80 140,-34 L170,-30 Q190,-20 190,10 L190,40 Z" fill="${col}" ${o(5)}/><path d="M-10,-40 L20,-76 Q50,-82 80,-78 L110,-40 Z" fill="#cfe9f7" ${o(3)}/><circle cx="-80" cy="40" r="28" fill="#2b2f3a" ${o(5)}/><circle cx="120" cy="40" r="28" fill="#2b2f3a" ${o(5)}/></g>`;
-    }
     return { bg, fg: "" };
   },
 
@@ -179,7 +183,7 @@ export const SCENES = {
     // sign
     bg += `<path d="M1700,${FLOOR - 120} L1700,${FLOOR - 380}" ${o(6)}/><rect x="1610" y="${FLOOR - 480}" width="180" height="110" rx="12" fill="#e8c34a" ${o(5)}/><text x="1700" y="${FLOOR - 410}" text-anchor="middle" font-size="40" fill="${INK}">DRIVE</text><text x="1700" y="${FLOOR - 378}" text-anchor="middle" font-size="30" fill="${INK}">AWAKE</text>`;
     // car (left)
-    bg += `<g transform="translate(140,${FLOOR - 60})"><path d="M0,0 L0,-90 Q20,-110 90,-115 L150,-185 Q190,-205 300,-200 Q360,-195 400,-120 L480,-110 Q510,-100 510,-60 L510,0 Z" fill="#d9776c" ${o(6)}/>
+    bg += `<g transform="translate(40,${FLOOR - 40}) scale(1.55)"><path d="M0,0 L0,-90 Q20,-110 90,-115 L150,-185 Q190,-205 300,-200 Q360,-195 400,-120 L480,-110 Q510,-100 510,-60 L510,0 Z" fill="#d9776c" ${o(6)}/>
       <path d="M165,-120 L200,-175 Q230,-185 290,-182 L330,-120 Z" fill="#9cc3e6" ${o(4)}/><circle cx="110" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="110" cy="0" r="18" fill="#9aa0ad"/><circle cx="410" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="410" cy="0" r="18" fill="#9aa0ad"/>
       <rect x="490" y="-95" width="26" height="22" rx="6" fill="#ffe39a" ${o(3)}/></g>` + glow(700, FLOOR - 120, 260, "#ffe39a", 0.45);
     return { bg, fg: "" };

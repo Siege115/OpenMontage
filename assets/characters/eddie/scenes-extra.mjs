@@ -51,8 +51,8 @@ export const EXTRA_SCENES = {
     // flowers
     for (let i = 0; i < 14; i++) { const x = 60 + i * 140 + r1(i) * 40, y = FLOOR + 30 + r1(i + 9) * 120; if (x > 650 && x < 1350) continue; bg += `<g transform="translate(${x},${y}) rotate(${S(t * 2 + i) * 8})"><path d="M0,0 L0,-22" stroke="#4f8a43" stroke-width="3"/><circle cy="-26" r="8" fill="${["#ffd84d", "#e9767a", "#c7a8e0"][i % 3]}" ${o(2)}/></g>`; }
     // bench
-    bg += `<g transform="translate(${bench},${FLOOR})"><rect x="-170" y="-150" width="340" height="22" rx="6" fill="#b98a63" ${o(4)}/><rect x="-170" y="-115" width="340" height="22" rx="6" fill="#b98a63" ${o(4)}/>
-      <rect x="-180" y="-70" width="360" height="24" rx="6" fill="#c99b72" ${o(4)}/><path d="M-150,-46 L-150,0 M150,-46 L150,0 M-150,-150 L-150,-70 M150,-150 L150,-70" ${o(7)}/></g>`;
+    bg += `<g transform="translate(${bench},${FLOOR})"><rect x="-210" y="-300" width="420" height="26" rx="8" fill="#b98a63" ${o(4)}/><rect x="-210" y="-258" width="420" height="26" rx="8" fill="#b98a63" ${o(4)}/>
+      <rect x="-225" y="-140" width="450" height="28" rx="8" fill="#c99b72" ${o(4)}/><path d="M-190,-112 L-198,0 M190,-112 L198,0 M-190,-300 L-190,-140 M190,-300 L190,-140" ${o(8)}/></g>`;
     // birds + falling leaves
     for (let i = 0; i < 3; i++) bg += bird(((t * (110 + i * 25) + i * 700) % 2300) - 150, 260 + i * 50 + S(t + i) * 15, t + i, 0.9 - i * 0.15);
     for (let i = 0; i < 6; i++) { const p = (t * 0.12 + i / 6) % 1; bg += `<ellipse cx="${200 + i * 300 + S(t * 1.5 + i) * 40}" cy="${300 + p * 600}" rx="9" ry="5" fill="#e0a03c" transform="rotate(${t * 90 + i * 60},${200 + i * 300},${300 + p * 600})" opacity="${1 - p * 0.5}"/>`; }
@@ -64,7 +64,7 @@ export const EXTRA_SCENES = {
     const sway = S(t * 2.3) * 2.5;
     let bg = `<g transform="translate(0,${sway})"><rect width="${W}" height="${FLOOR}" fill="#e3e8ee"/>`;
     // windows with streaking tunnel lights
-    bg += `<rect x="0" y="230" width="${W}" height="230" fill="#22262f"/>`;
+    bg += `<rect x="0" y="230" width="${W}" height="230" fill="#46506b"/>`;
     for (let i = 0; i < 9; i++) { const x = ((-t * 2600 + i * 420) % 3780 + 3780) % 3780 - 300; bg += `<rect x="${x}" y="${300 + (i % 3) * 40}" width="260" height="8" rx="4" fill="#ffe39a" opacity=".85"/>`; }
     for (let i = 0; i < 4; i++) { const x = ((-t * 1800 + i * 600) % 2400 + 2400) % 2400 - 200; bg += `<rect x="${x}" y="250" width="14" height="190" fill="#3a3f4b"/>`; }
     for (const x of [0, 480, 960, 1440]) bg += `<rect x="${x + 20}" y="230" width="440" height="230" rx="26" fill="none" stroke="#c4ccd6" stroke-width="22"/><rect x="${x + 20}" y="230" width="440" height="230" rx="26" fill="none" ${o(5)}/>`;
@@ -75,9 +75,8 @@ export const EXTRA_SCENES = {
     bg += `<path d="M0,60 L${W},60" ${o(9)}/>`;
     for (let i = 0; i < 9; i++) { const x = 120 + i * 210, a = S(t * 2.3 + i * 0.4) * 9; bg += `<g transform="rotate(${a},${x},60)"><path d="M${x},60 L${x},120" ${o(4)}/><circle cx="${x}" cy="138" r="18" fill="none" ${o(5)}/></g>`; }
     // seats + poles + floor
-    bg += `<rect x="0" y="560" width="${W}" height="150" fill="#5b8fd9" ${o(5)}/>`;
-    for (let x = 0; x < W; x += 240) bg += `<path d="M${x},560 L${x},710" stroke="#4a78bd" stroke-width="6"/>`;
-    bg += `<rect x="0" y="700" width="${W}" height="${FLOOR - 700}" fill="#c4ccd6"/>`;
+    for (let x = 0; x < W; x += 240) bg += `<rect x="${x + 10}" y="560" width="220" height="180" rx="18" fill="#5b8fd9" ${o(5)}/><rect x="${x + 26}" y="576" width="188" height="140" rx="12" fill="#6c9ce0"/>`;
+    bg += `<rect x="0" y="738" width="${W}" height="30" rx="10" fill="#4a78bd" ${o(5)}/><rect x="0" y="768" width="${W}" height="${FLOOR - 768}" fill="#b4bcc8"/>`;
     bg += `<rect x="0" y="${FLOOR}" width="${W}" height="${1080 - FLOOR}" fill="#9aa3ae"/><path d="M0,${FLOOR} L${W},${FLOOR}" ${o(5)}/><rect x="0" y="${FLOOR + 24}" width="${W}" height="10" fill="#f7d774"/>`;
     bg += `</g>`;
     const fg = `<g transform="translate(0,${sway})"><path d="M330,0 L330,${FLOOR}" stroke="#c9cdd4" stroke-width="18"/><path d="M330,0 L330,${FLOOR}" fill="none" ${o(4)}/>
@@ -145,7 +144,8 @@ export const EXTRA_SCENES = {
 
   // ------------------------------------------------------------------ house party (night)
   party({} = {}, t = 0) {
-    let bg = `<rect width="${W}" height="${FLOOR}" fill="#3b2f55"/>`;
+    let bg = `<defs><linearGradient id="pw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a5bb5"/><stop offset="1" stop-color="#a873b8"/></linearGradient></defs><rect width="${W}" height="${FLOOR}" fill="url(#pw)"/>`;
+    for (let x = 0; x < W; x += 120) bg += `<rect x="${x}" y="0" width="60" height="${FLOOR}" fill="#fff" opacity=".05"/>`;
     // roving disco spots
     for (let i = 0; i < 9; i++) { const x = 960 + S(t * 0.7 + i * 1.3) * 900, y = 380 + C(t * 0.9 + i * 2.1) * 300; bg += `<circle cx="${x}" cy="${y}" r="${30 + (i % 3) * 14}" fill="${["#ff6bb5", "#6bd4ff", "#ffe36b", "#8bff8b"][i % 4]}" opacity=".35"/>`; }
     // string lights
@@ -157,7 +157,7 @@ export const EXTRA_SCENES = {
     bg += `<path d="M-55,0 L55,0 M-48,-27 L48,-27 M-48,27 L48,27" stroke="#9aa0ad" stroke-width="3"/></g>`;
     // balloons
     for (const [i, x] of [[0, 180], [1, 300], [2, 1700], [3, 1810]].entries()) { const y = 260 + S(t * 1.4 + i) * 12; bg += `<path d="M${x},${y + 60} Q${x + 10},${y + 160} ${x - 6},${y + 260}" fill="none" stroke="#111" stroke-width="2"/><ellipse cx="${x}" cy="${y}" rx="48" ry="60" fill="${["#ff6b6b", "#ffe36b", "#6bd4ff", "#c7a8e0"][i]}" ${o(4)}/>`; }
-    bg += `<rect y="${FLOOR}" width="${W}" height="${1080 - FLOOR}" fill="#2a2140"/><path d="M0,${FLOOR} L${W},${FLOOR}" ${o(5)}/>`;
+    bg += `<rect y="${FLOOR}" width="${W}" height="${1080 - FLOOR}" fill="#5a4580"/><path d="M0,${FLOOR} L${W},${FLOOR}" ${o(5)}/>`;
     // pulsing speaker + snack table
     const pulse = 1 + Math.max(0, S(t * 2 * Math.PI * 2)) * 0.08;
     bg += `<g transform="translate(1640,${FLOOR})"><rect x="-90" y="-330" width="180" height="330" rx="12" fill="#22202b" ${o(5)}/><circle cy="-230" r="${46 * pulse}" fill="#3d3a4a" ${o(5)}/><circle cy="-90" r="${62 * pulse}" fill="#3d3a4a" ${o(5)}/><circle cy="-90" r="18" fill="#111"/></g>`;
@@ -186,23 +186,23 @@ export const EXTRA_SCENES = {
 
   // ------------------------------------------------------------------ rock concert
   concert({} = {}, t = 0) {
-    let bg = `<rect width="${W}" height="1080" fill="#15131f"/>`;
+    let bg = `<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a7a"/><stop offset=".7" stop-color="#8a3f9e"/><stop offset="1" stop-color="#d4628f"/></linearGradient></defs><rect width="${W}" height="1080" fill="url(#cg)"/>`;
     // sweeping beams
     for (let i = 0; i < 6; i++) {
       const x = 200 + i * 300, a = S(t * 1.6 + i * 1.1) * 28;
-      bg += `<g transform="rotate(${a},${x},80)"><path d="M${x - 14},80 L${x + 14},80 L${x + 160},${FLOOR} L${x - 160},${FLOOR} Z" fill="${["#ff6bb5", "#6bd4ff", "#ffe36b"][i % 3]}" opacity=".22"/></g>`;
+      bg += `<g transform="rotate(${a},${x},80)"><path d="M${x - 14},80 L${x + 14},80 L${x + 160},${FLOOR} L${x - 160},${FLOOR} Z" fill="${["#ff6bb5", "#6bd4ff", "#ffe36b"][i % 3]}" opacity=".35"/></g>`;
     }
-    bg += `<rect x="0" y="60" width="${W}" height="30" fill="#2b2838" ${o(4)}/>`;
+    bg += `<rect x="0" y="60" width="${W}" height="30" fill="#4a4060" ${o(4)}/>`;
     for (let i = 0; i < 6; i++) bg += `<circle cx="${200 + i * 300}" cy="96" r="20" fill="${["#ff6bb5", "#6bd4ff", "#ffe36b"][i % 3]}" ${o(3)}/>`;
     // stage + speaker stacks + band silhouette
-    bg += `<rect x="300" y="560" width="1320" height="60" fill="#2b2838" ${o(5)}/>`;
+    bg += `<rect x="300" y="560" width="1320" height="60" fill="#5a4680" ${o(5)}/>`;
     const pulse = 1 + Math.max(0, S(t * TAU * 2.2)) * 0.1;
     for (const x of [140, 1780]) bg += `<g transform="translate(${x},620)"><rect x="-110" y="-380" width="220" height="380" fill="#22202b" ${o(5)}/><circle cy="-280" r="${54 * pulse}" fill="#3d3a4a" ${o(4)}/><circle cy="-110" r="${70 * pulse}" fill="#3d3a4a" ${o(4)}/></g>`;
-    for (const [i, x] of [[0, 700], [1, 960], [2, 1220]].entries()) { const j = Math.abs(S(t * 7 + i)) * 14; bg += `<g transform="translate(${x},${560 - j})"><circle cy="-170" r="34" fill="#0d0c13"/><path d="M0,-136 L0,-50 M0,-50 L-30,0 M0,-50 L30,0 M0,-115 L-40,-70 M0,-115 L40,-80" stroke="#0d0c13" stroke-width="12" stroke-linecap="round"/></g>`; }
-    bg += `<rect y="620" width="${W}" height="${1080 - 620}" fill="#1d1a29"/>`;
+    for (const [i, x] of [[0, 700], [1, 960], [2, 1220]].entries()) { const j = Math.abs(S(t * 7 + i)) * 14; bg += `<g transform="translate(${x},${560 - j})"><circle cy="-170" r="34" fill="#2a1f4a"/><path d="M0,-136 L0,-50 M0,-50 L-30,0 M0,-50 L30,0 M0,-115 L-40,-70 M0,-115 L40,-80" stroke="#2a1f4a" stroke-width="12" stroke-linecap="round"/></g>`; }
+    bg += `<rect y="620" width="${W}" height="${1080 - 620}" fill="#4a2f6a"/>`;
     // bouncing crowd heads (foreground)
     let fg = "";
-    for (let i = 0; i < 26; i++) { const x = i * 78 - 10, b = Math.abs(S(t * 6 + i * 0.7)) * 22; fg += `<circle cx="${x}" cy="${1000 - b}" r="44" fill="#0d0c13"/>`; if (i % 4 === 1) fg += `<path d="M${x + 20},${960 - b} L${x + 40},${860 - b}" stroke="#0d0c13" stroke-width="14" stroke-linecap="round"/>`; }
+    for (let i = 0; i < 26; i++) { const x = i * 78 - 10, b = Math.abs(S(t * 6 + i * 0.7)) * 22; fg += `<circle cx="${x}" cy="${1000 - b}" r="44" fill="#2a1f4a"/>`; if (i % 4 === 1) fg += `<path d="M${x + 20},${960 - b} L${x + 40},${860 - b}" stroke="#2a1f4a" stroke-width="14" stroke-linecap="round"/>`; }
     return { bg, fg };
   },
 };

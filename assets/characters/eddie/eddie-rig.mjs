@@ -96,9 +96,9 @@ function shoe(A, side, rot = 0) {
   );
 }
 
-function leg(H, spec, side) {
-  const [K, A] = limb(H, spec, LEN.thigh, LEN.shin);
-  return stick([H, K, A], LIMB + 2, LIMB - 0.5) + shoe(add(A, dir(angleOf(K, A)), 3), side, spec.shoeRot ?? 0);
+function leg(H, spec, side, thighK = 1) {
+  const [K, A] = limb(H, spec, LEN.thigh * thighK, LEN.shin);
+  return stick([H, K, A], LIMB + 2, LIMB - 0.5) + shoe(add(A, dir(angleOf(K, A)), 3), spec.shoeSide ?? side, spec.shoeRot ?? 0);
 }
 
 // ---------- head + faces ----------
@@ -209,6 +209,24 @@ export function head(expr = "neutral", mouth = 0, acc = null) {
 
 const BUBBLE_DEFS = `<defs><linearGradient id="bubbleShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf1"/></linearGradient></defs>`;
 export const PROPS = {
+  chair: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <rect x="-112" y="-340" width="150" height="190" rx="26" fill="#5b6475" stroke="${P.ink}" stroke-width="5"/><rect x="-94" y="-320" width="114" height="150" rx="18" fill="#6f7a8d"/>
+    <rect x="-110" y="-142" width="230" height="34" rx="14" fill="#6f7a8d" stroke="${P.ink}" stroke-width="5"/>
+    <path d="M0,-108 L0,-40 M-80,-14 L80,-14 M0,-40 L-70,-14 M0,-40 L70,-14 M-60,-150 L-60,-170" fill="none" stroke="${P.ink}" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="-80" cy="-8" r="9" fill="${P.ink}"/><circle cx="80" cy="-8" r="9" fill="${P.ink}"/><circle cx="0" cy="-8" r="9" fill="${P.ink}"/></g>`,
+  // reaction pops drawn next to a head (o = head-top-right corner)
+  emote: (o, a = {}) => {
+    const k = a.kind, c = P.ink;
+    const E = {
+      bang: `<path d="M-6,-58 L6,-58 L4,-12 L-4,-12 Z" fill="#ff5a4a" stroke="${c}" stroke-width="4"/><circle cx="0" cy="4" r="6" fill="#ff5a4a" stroke="${c}" stroke-width="4"/><path d="M-30,-40 L-44,-52 M30,-40 L44,-52 M-34,-12 L-50,-12 M34,-12 L50,-12" stroke="${c}" stroke-width="4" stroke-linecap="round"/>`,
+      sweat: `<path d="M0,-40 q16,22 0,30 q-16,-8 0,-30z" fill="#7cc3ff" stroke="${c}" stroke-width="3.5"/><path d="M26,-14 q11,15 0,21 q-11,-6 0,-21z" fill="#7cc3ff" stroke="${c}" stroke-width="3"/><path d="M-4,-30 q-3,6 0,10" stroke="#fff" stroke-width="3" fill="none"/>`,
+      q: `<text x="0" y="0" text-anchor="middle" font-size="70" fill="#5b8fd9" stroke="${c}" stroke-width="4" paint-order="stroke" style="font-family:MBlack,sans-serif;font-weight:900">?</text>`,
+      spark: [[-30, -30, 1], [20, -50, 0.7], [34, -6, 0.55]].map(([x, y, s]) => `<path transform="translate(${x},${y}) scale(${s})" d="M0,-20 Q3,-3 20,0 Q3,3 0,20 Q-3,3 -20,0 Q-3,-3 0,-20 Z" fill="#ffd84d" stroke="${c}" stroke-width="3.5" stroke-linejoin="round"/>`).join(""),
+      anger: `<g stroke="#e5383b" stroke-width="7" stroke-linecap="round" fill="none"><path d="M-22,-30 Q-8,-22 -14,-8 M22,-30 Q8,-22 14,-8 M-22,8 Q-8,0 -14,-14 M22,8 Q8,0 14,-14"/></g>`,
+      heart: `<path d="M0,-6 C-18,-24 -36,-6 -18,10 L0,26 L18,10 C36,-6 18,-24 0,-6 Z" fill="#ff6b8b" stroke="${c}" stroke-width="4" stroke-linejoin="round"/>`,
+    };
+    return `<g transform="translate(${o[0]},${o[1]})">${E[k] ?? ""}</g>`;
+  },
   waveLines: (o) => `<g fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round">
     <path d="M${o[0] + 18},${o[1] - 16} Q${o[0] + 28},${o[1]} ${o[0] + 18},${o[1] + 16}"/>
     <path d="M${o[0] + 28},${o[1] - 24} Q${o[0] + 42},${o[1]} ${o[0] + 28},${o[1] + 24}"/></g>`,
@@ -333,7 +351,8 @@ export function character(pose) {
   const legL = pose.legL ?? { a1: -10, a2: -4 };
   const legR = pose.legR ?? { a1: 10, a2: 4 };
 
-  let g = leg([0, 0], legL, -1) + leg([0, 0], legR, 1);
+  const tk = pose.thighK ?? 1; // <1 = thighs foreshortened (seated, knees toward the camera)
+  let g = leg([0, 0], legL, -1, tk) + leg([0, 0], legR, 1, tk);
   g += stick([[0, 0], add([0, 0], dir(180 - lean * 0.6), LEN.torso * 0.5), N], LIMB + 3, LIMB + 0.5);
   if (!pose.frontArms) {
     g += arm(S, armL);
@@ -500,10 +519,11 @@ export const POSES = {
     label: "Listening", expr: "focused", headTilt: -10,
     overHead: { target: [58, -146], bend: 1, thumb: 200 }, armL: { a1: -12, a2: -4 },
   },
+  // natural front-facing seated pose: thighs foreshortened toward camera, knees together, hands on lap
   sitBench: {
-    label: "Sitting", expr: "calm", sit: true,
-    legL: { a1: -60, a2: 6 }, legR: { a1: 60, a2: -6 },
-    armL: { target: [-46, -6], bend: -1 }, armR: { target: [46, -6], bend: 1 },
+    label: "Sitting", expr: "calm", sit: true, sitH: 72,
+    legL: { a1: 84, a2: 4, shoeSide: 1 }, legR: { a1: 93, a2: -3, shoeSide: 1 },
+    armL: { target: [20, -6], bend: -1 }, armR: { target: [50, -4], bend: 1 },
   },
   phone: {
     label: "Phone", expr: "focused", headTilt: 10,
