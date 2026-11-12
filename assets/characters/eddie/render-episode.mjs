@@ -19,6 +19,8 @@ import { createHash } from "node:crypto";
 import { character, resolvePose, lerpPose, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
 import { SCENES as BASE_SCENES } from "./scenes.mjs";
 import { EXTRA_SCENES } from "./scenes-extra.mjs";
+import { EASE, spring, seg, life, keys, stagger, lerp } from "./motion.mjs";
+import { SFX_AVAILABLE, mixCues } from "./sfx.mjs";
 const SCENES = { ...BASE_SCENES, ...EXTRA_SCENES };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -142,7 +144,7 @@ for (const b of BEATS) {
     if (cur.length >= 3 || txt.length > 16 || /[.,?!…:;]$/.test(w.w)) { chunks.push(cur); cur = []; }
   }
   if (cur.length) chunks.push(cur);
-  b.chunks = chunks.map((c) => ({ text: c.map((x) => x.w).join(" "), s: c[0].s, e: c[c.length - 1].e }));
+  b.chunks = chunks.map((c) => ({ text: c.map((x) => x.w).join(" "), words: c, s: c[0].s, e: c[c.length - 1].e }));
 }
 
 // loudness envelope at character frame rate -> lip flaps
@@ -186,6 +188,15 @@ for (const [k, [src, fx]] of Object.entries(SFX)) {
 }
 const POSE_LIB = { ...POSES, stand: { expr: "neutral" } };
 const sceneKey = (b) => JSON.stringify(b.scene ?? null);
+// ---- transition chosen by meaning (MOTION.md §6) ----
+const IMPACT_POSES = new Set(["shocked", "scared", "panic", "coverEars"]);
+const TR = BEATS.map((b, i) => {
+  if (i === 0 || sceneKey(BEATS[i - 1]) === sceneKey(b)) return null;
+  if (b.transition) return b.transition;
+  if (IMPACT_POSES.has(b.pose)) return "cut";
+  if (BEATS[i - 1].scene?.name === b.scene?.name) return "dip"; // same place, later time
+  return ["whip", "slide", "whip", "iris"][i % 4];
+});
 const events = [];
 BEATS.forEach((b, i) => {
   const pb = BEATS[i - 1];
@@ -198,7 +209,32 @@ BEATS.forEach((b, i) => {
   for (const it of b.items ?? []) if (it.delay !== undefined) events.push([b.start + it.delay, "pop", 0.45]);
 });
 const mix = new Float32Array(Math.ceil((TOTAL + 1) * 44100)); // sfx
-for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
+if (SFX_AVAILABLE) {
+  // SFX Kit cues: `at` is the moment the sound's sync point should meet (GUIDE.md: start = moment - sync.at)
+  const cues = [], cue = (id, at, gainDb = 0) => cues.push({ id, at, gainDb });
+  BEATS.forEach((b, i) => {
+    const t0 = b.start, tr = TR[i];
+    if (tr === "whip") cue("whoosh-fast-medium", t0 + 0.09);           // move-peak: ~25% into the ease-out whip
+    if (tr === "slide") cue("swipe-medium-soft", t0);                    // action-start
+    if (tr === "iris") cue("reverse-whoosh-short-soft", t0 + 0.4);       // arrival: the iris is fully open
+    if (tr === "dip") cue("whoosh-slow-soft", t0, -4);
+    if (tr === "cut") cue("impact-medium-hard", t0 + 0.02);
+    else if (IMPACT_POSES.has(b.pose) && BEATS[i - 1]?.pose !== b.pose) cue("impact-light-firm", t0 + 0.05);
+    if (b.day && b.day !== "-") { cue("swish-medium", t0 + 0.08); cue("impact-light-soft", t0 + 0.3, -3); }
+    if (b.card) { cue("pop-large-in", t0 + 0.12); cue("pop-small-out", t0 + b.dur - 0.12, -5); }
+    if (b.blackout) cue("digital-signal-drop", t0 + 1.6);
+    for (const it of b.items ?? []) if (it.delay !== undefined) cue(it.type === "say" ? "pop-medium-in" : it.type === "thought" ? "pop-small-bubble" : "pop-small-in", t0 + it.delay + 0.04, -2);
+    const act = { celebrate: ["celebration-popper", 0.15], idea: ["shimmer-short-bright", 0.1], highFive: ["click-clap-firm", 0.4], type: ["keyboard-typing-steady-medium", 0.2],
+      phone: ["phone-vibrate-hand", 0.5], coffee: ["foley-glass-touch", 0.35], read: ["props-page-turn", 0.4], giveGift: ["props-box-open", 0.45], sneak: ["foley-fabric-slide", 0.2], dance: ["move-bounce", 0.2] }[b.pose];
+    if (act && BEATS[i - 1]?.pose !== b.pose) cue(act[0], t0 + act[1], -3);
+    if (b.riser) cue("riser-2s-soft", t0 + b.riser);                    // arrival at the reveal
+  });
+  const speech = BEATS.map((b) => [b.start, b.start + b.speech]);
+  const placed = mixCues(mix, cues, speech, 10 ** (-2 / 20));
+  console.log(`sfx: ${placed.length} SFX Kit cues`);
+} else {
+  for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
+}
 const music = new Float32Array(mix.length);
 if (!args.includes("--no-music")) {
   // soft pad: Cmaj7 / Am7 / Fmaj7 / G6, 4 s each, gentle swell
@@ -265,7 +301,7 @@ for (const [i, b] of BEATS.entries()) {
 function camera(type, prog, cx, py, pose, inOut, custom) {
   if (custom) {
     // crafted move: pan/zoom from -> to over the beat (world coords), eased
-    const e = ease(Math.min(1, prog)), f = custom.from ?? [cx, py - 90], g = custom.to ?? f;
+    const e = EASE.cinematic(Math.min(1, prog)), f = custom.from ?? [cx, py - 90], g = custom.to ?? f;
     const z = (custom.z0 ?? custom.z ?? 1.3) + ((custom.z1 ?? custom.z ?? 1.3) - (custom.z0 ?? custom.z ?? 1.3)) * e;
     const s = BASE * z, vw = OW / s, vh = OH / s;
     let fx = f[0] + (g[0] - f[0]) * e, fy = f[1] + (g[1] - f[1]) * e;
@@ -279,7 +315,12 @@ function camera(type, prog, cx, py, pose, inOut, custom) {
   if (type === "push") { z = 1.08; fx = W / 2; fy = H / 2; }
   if (type === "medium") { z = 1.4; fx = lying ? cx - 60 : cx; fy = lying ? py - 40 : py - 90; }
   if (type === "close") { z = 2.0; fx = headX; fy = headY + 30; }
-  z *= inOut ? 1 + 0.04 * prog : 1.04 - 0.04 * prog;
+  // vary the ambient move per shot (never the same zoom everywhere): push / pull / drift / hold
+  const mode = (Math.round(cx) + (inOut ? 1 : 0) + type.length) % 4;
+  if (mode === 0) z *= 1 + 0.06 * EASE.power2.out(prog);
+  if (mode === 1) z *= 1.06 - 0.06 * EASE.sine.inOut(prog);
+  if (mode === 2) fx += (EASE.sine.inOut(prog) - 0.5) * 60 / z;
+  if (mode === 3) z *= 1 + 0.01 * prog;
   const s = BASE * z, vw = OW / s, vh = OH / s;
   fx = Math.min(W - vw / 2, Math.max(vw / 2, fx)); fy = Math.min(H - vh / 2, Math.max(vh / 2, fy));
   return { s, fx, fy, blur: type === "close" ? 3.2 : type === "medium" ? 2 : 1.1 };
@@ -296,9 +337,16 @@ function frameSVG(t) {
   // pose snap: one in-between frame, then the key pose
   const lyingSwap = [pb.pose, b.pose].some((x) => x === "lie" || x === "lieAwake") && pb.pose !== b.pose;
   // eased pose change with a little overshoot (follow-through), ~0.4 s
-  const q0 = Math.min(1, ltc / 0.42), c1 = 1.5, c3 = c1 + 1;
-  const k = i === 0 || sceneChanged || lyingSwap ? 1 : 1 + c3 * Math.pow(q0 - 1, 3) + c1 * Math.pow(q0 - 1, 2);
-  const pose = lerpPose(resolved[Math.max(0, i - 1)], resolved[i], k);
+  // acting (MOTION.md §3): anticipation (small counter-move), then a back.out overshoot settle;
+  // overlapping action: body leads, arms trail ~50/80 ms, head ~60 ms
+  const snap = i === 0 || sceneChanged || lyingSwap;
+  const act = (d) => snap ? 1 : keys(ltc - d, [[0, 0], [0.08, -0.07, EASE.sine.out], [0.5, 1, EASE.back.out]]);
+  const kBody = act(0), kArmL = act(0.05), kArmR = act(0.08), kHead = act(0.06);
+  const k = kBody;
+  const prevR = resolved[Math.max(0, i - 1)], curR = resolved[i];
+  const pose = lerpPose(prevR, curR, kBody);
+  const pa = lerpPose(prevR, curR, kArmL), pr = lerpPose(prevR, curR, kArmR), ph0 = lerpPose(prevR, curR, kHead);
+  pose.armL = pa.armL; if (!pose.overHead) pose.armR = pr.armR; pose.headTilt = ph0.headTilt;
   const anim = POSE_LIB[b.pose].anim;
   const ph = tc * 2 * Math.PI;
   const speaking = ltc < b.speech, lv = speaking ? loud(tc) : 0;
@@ -361,8 +409,8 @@ function frameSVG(t) {
   if (TALKERS.has(b.pose) && !blinking && speaking) pose.mouth = mouthAt(b, lt, tc);
 
   // squash & stretch on a pose snap (character frames 0..3)
-  const qs = Math.min(1, ltc / 0.36);
-  const sy = poseChanged && qs < 1 ? 1 - 0.11 * Math.sin(qs * 2 * Math.PI) * (1 - qs) : 1, sx = 1 / Math.sqrt(sy);
+  // squash on the anticipation, stretch on the release, settle (volume preserved)
+  const sy = poseChanged ? keys(ltc, [[0, 1], [0.08, 0.93, EASE.sine.out], [0.2, 1.05, EASE.power2.out], [0.42, 1, EASE.sine.inOut]]) : 1, sx = 1 / Math.sqrt(sy);
 
   const [x1, y1] = placement(b, lt);
   const [x0, y0] = sceneChanged ? [x1, y1] : placement(pb, pb.dur);
@@ -423,9 +471,14 @@ function frameSVG(t) {
   const drawItems = (bubbles) => { let out = ""; for (const it of b.items ?? []) {
     if (isBubble(it) !== bubbles) continue;
     if (it.delay && lt < it.delay) continue;
-    const pop = it.delay !== undefined ? 1 + 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.15) - 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.06) : 1;
+    let pop = 1, op = 1;
+    if (it.delay !== undefined) {
+      pop = 0.2 + 0.8 * spring(lt - it.delay, { stiffness: 260, damping: 13 });           // springy entrance
+      const out = seg(lt, b.dur - 0.2, 0.18, EASE.power2.in);                              // quick, accelerating exit
+      pop *= 1 - 0.35 * out; op = 1 - out;
+    }
     const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
-    out += `<g transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
+    out += `<g opacity="${op.toFixed(3)}" transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
   } return out; };
   world += drawItems(false);
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
@@ -440,7 +493,8 @@ function frameSVG(t) {
   // scene transitions: flash / whip-pan / iris / slide, rotating through the episode
   let tx = 0, wrapOpen = "", wrapClose = "", trFilter = "";
   if (sceneChanged && lt < 0.4) {
-    const style = b.transition ?? ["whip", "iris", "slide", "flash"][(sceneIdx.get(i) ?? 0) % 4], e = ease(Math.min(1, lt / 0.35));
+    const style = TR[i] ?? "whip", e = EASE.expo.out(Math.min(1, lt / 0.35));
+    if (style === "dip") wrapClose = `<rect width="${OW}" height="${OH}" fill="#000" opacity="${(1 - EASE.sine.out(Math.min(1, lt / 0.3))).toFixed(3)}"/>`;
     if (style === "whip") { tx = (1 - e) * OW * 0.9 * (i % 2 ? 1 : -1); trFilter = `<filter id="whip" x="-20%" y="0" width="140%" height="100%"><feGaussianBlur stdDeviation="${(1 - e) * 60} 0"/></filter>`; wrapOpen = `<g filter="url(#whip)">`; wrapClose = "</g>"; }
     if (style === "slide") tx = (1 - e) * OW * (i % 2 ? -1 : 1);
     if (style === "iris") { trFilter = `<clipPath id="iris"><circle cx="${OW / 2}" cy="${OH / 2}" r="${e * Math.hypot(OW, OH) * 0.6}"/></clipPath>`; wrapOpen = `<rect width="${OW}" height="${OH}" fill="#000"/><g clip-path="url(#iris)">`; wrapClose = "</g>"; }
@@ -451,33 +505,49 @@ function frameSVG(t) {
 
   // HUD -------------------------------------------------------------
   const M = "font-family:'MBlack',sans-serif;font-weight:900";
-  let day = null, dayStart = 0;
+  // day stamp: expo.out fly-in with a springy rotation, gentle breathe, ease-in exit before the next day
+  let day = null, dayStart = 0, dayEnd = TOTAL;
   for (let j = i; j >= 0; j--) if (BEATS[j].day) { day = BEATS[j].day; dayStart = BEATS[j].start; break; }
+  for (let j = i + 1; j < BEATS.length; j++) if (BEATS[j].day) { dayEnd = BEATS[j].start; break; }
   if (day && day !== "-") {
-    const a = Math.min(1, (t - dayStart) / 0.25), x = -300 + 340 * ease(a), y = VERTICAL ? 140 : 50;
-    s += `<g transform="translate(${x},${y}) rotate(-3)"><rect x="5" y="7" width="250" height="88" rx="16" fill="rgba(0,0,0,0.25)"/><rect width="250" height="88" rx="16" fill="#ff5a4a" stroke="#000" stroke-width="6"/>
+    const ta = t - dayStart, x = lerp(-320, VERTICAL ? 40 : 40, seg(ta, 0, 0.5, EASE.expo.out));
+    const rot = lerp(-16, -3, seg(ta, 0.05, 0.6, EASE.back.out)) + Math.sin(t * 1.3) * 0.6;
+    const exitY = -170 * seg(t, dayEnd - 0.25, 0.22, EASE.power2.in), y = (VERTICAL ? 140 : 50) + exitY;
+    s += `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${rot.toFixed(2)})"><rect x="5" y="8" width="250" height="88" rx="16" fill="rgba(0,0,0,0.25)"/><rect width="250" height="88" rx="16" fill="#ff5a4a" stroke="#000" stroke-width="6"/>
       <text x="125" y="62" text-anchor="middle" font-size="52" fill="#fff" style="${M}">${day}</text></g>`;
   }
+  // fact card: spring scale-in + rotation settle, lines stagger up, fast ease-in exit (asymmetry)
   if (b.card) {
-    const a = Math.min(1, lt / 0.2), scl = 0.5 + 0.5 * ease(a) + 0.06 * Math.sin(Math.min(1, lt / 0.35) * Math.PI);
+    const sc0 = 0.3 + 0.7 * spring(lt - 0.08, { stiffness: 220, damping: 15 }), rot = lerp(-10, -2, seg(lt, 0.08, 0.55, EASE.back.out));
+    const ex = seg(lt, b.dur - 0.24, 0.22, EASE.power2.in), scl = sc0 * (1 - 0.15 * ex), op = Math.min(1, seg(lt, 0.08, 0.12)) * (1 - ex);
     const lines = []; let line = "";
     for (const w of b.card.split(" ")) { if ((line + " " + w).trim().length > 13 && line) { lines.push(line); line = w; } else line = (line + " " + w).trim(); }
     lines.push(line);
     const bw = Math.max(...lines.map((l) => l.length)) * 50 + 90, bh = lines.length * 96 + 56;
-    const cxCard = VERTICAL ? OW / 2 : 1390, cyCard = (VERTICAL ? 1480 : 110) + bh / 2;
-    s += `<g transform="translate(${cxCard},${cyCard}) rotate(-2) scale(${scl})" opacity="${a}">
+    const cxCard = VERTICAL ? OW / 2 : 1390, cyCard = (VERTICAL ? 1480 : 110) + bh / 2 - 20 * ex;
+    s += `<g transform="translate(${cxCard},${cyCard.toFixed(1)}) rotate(${rot.toFixed(2)}) scale(${scl.toFixed(3)})" opacity="${op.toFixed(3)}">
       <rect x="${-bw / 2 + 8}" y="${-bh / 2 + 10}" width="${bw}" height="${bh}" rx="20" fill="rgba(0,0,0,0.25)"/>
       <rect x="${-bw / 2}" y="${-bh / 2}" width="${bw}" height="${bh}" rx="20" fill="#ffd84d" stroke="#000" stroke-width="7"/>` +
-      lines.map((l, j) => `<text x="0" y="${-bh / 2 + 88 + j * 96}" text-anchor="middle" font-size="76" fill="#000" style="${M}">${esc(l)}</text>`).join("") + `</g>`;
+      lines.map((l, j) => { const q = seg(lt, 0.18 + stagger(j, lines.length, 0.07), 0.3, EASE.power3.out);
+        return `<text x="0" y="${(-bh / 2 + 88 + j * 96 + (1 - q) * 26).toFixed(1)}" opacity="${q.toFixed(3)}" text-anchor="middle" font-size="76" fill="#000" style="${M}">${esc(l)}</text>`; }).join("") + `</g>`;
   }
-  const ch = b.chunks.find((c, j) => lt >= c.s - 0.05 && lt < (b.chunks[j + 1]?.s ?? c.e + 0.35) - 0.05);
+  // kinetic captions: words rise in on their own cue (power3.out), the spoken word lights up
+  const ch = b.chunks.find((c, j) => lt >= c.s - 0.08 && lt < (b.chunks[j + 1]?.s ?? c.e + 0.35) - 0.08);
   if (ch) {
-    const pop = 1 + 0.16 * Math.max(0, 1 - (lt - ch.s + 0.05) / 0.12);
-    const fs = Math.min(VERTICAL ? 100 : 88, ((VERTICAL ? 980 : 1700) / Math.max(1, ch.text.length)) / 0.62), cy = VERTICAL ? 1300 : 920;
-    s += `<g transform="translate(${OW / 2},${cy}) scale(${pop.toFixed(3)})"><text x="0" y="0" text-anchor="middle" font-size="${fs}" fill="#fff" stroke="#000" stroke-width="${fs * 0.2}" stroke-linejoin="round" paint-order="stroke" style="${M}">${esc(ch.text)}</text></g>`;
+    const maxW = VERTICAL ? 960 : 1650, base = VERTICAL ? 100 : 88;
+    const raw = ch.words.reduce((n, w) => n + (WIDTH[w.w] ?? w.w.length * 70), 0) + SPACE * (ch.words.length - 1);
+    const fs = Math.min(base, (maxW / raw) * 100), k = fs / 100, cy = VERTICAL ? 1300 : 920;
+    let x = OW / 2 - (raw * k) / 2;
+    for (const w of ch.words) {
+      const ww = (WIDTH[w.w] ?? w.w.length * 70) * k, q = seg(lt, w.s - 0.07, 0.2, EASE.power3.out);
+      const active = lt >= w.s - 0.02 && lt <= w.e + 0.06, sc = (0.86 + 0.14 * EASE.back.out(q)) * (active ? 1.06 : 1);
+      if (q > 0) s += `<g transform="translate(${(x + ww / 2).toFixed(1)},${(cy + (1 - q) * 30).toFixed(1)}) scale(${sc.toFixed(3)})" opacity="${q.toFixed(3)}"><text x="0" y="0" text-anchor="middle" font-size="${fs.toFixed(1)}" fill="${active ? "#ffd84d" : "#fff"}" stroke="#000" stroke-width="${(fs * 0.2).toFixed(1)}" stroke-linejoin="round" paint-order="stroke" style="${M}">${esc(w.w)}</text></g>`;
+      x += ww + SPACE * k;
+    }
   }
   if (b.blackout && lt > 1.6 && lt < 2.5) s += `<rect width="${OW}" height="${OH}" fill="#000"/>`;
 
+  if (TR[i + 1] === "dip" && lt > b.dur - 0.28) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${EASE.power2.in(Math.min(1, (lt - (b.dur - 0.28)) / 0.28)).toFixed(3)}"/>`;
   const fade = Math.min(1, t / 0.4, (TOTAL - t) / 0.8);
   if (fade < 1) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${(1 - Math.max(0, fade)).toFixed(3)}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}" viewBox="0 0 ${OW} ${OH}"><defs>
@@ -505,6 +575,13 @@ await page.setContent(`<html><head><style>
   body{margin:0;overflow:hidden} text{font-family:InkHand,sans-serif}</style></head><body><div id="s"></div></body></html>`);
 await page.evaluate(() => Promise.all([document.fonts.load("40px InkHand"), document.fonts.load("900 40px MBlack"), document.fonts.load("800 40px Bubble")]));
 
+// measure every caption word in the real font (so kinetic word layout is exact)
+const WIDTH = {}; let SPACE = 28;
+{
+  const words = [...new Set(BEATS.flatMap((b) => b.words.map((w) => w.w)))];
+  const res = await page.evaluate((ws) => { const c = document.createElement("canvas").getContext("2d"); c.font = "900 100px MBlack"; return { w: ws.map((x) => c.measureText(x).width), sp: c.measureText(" ").width }; }, words);
+  words.forEach((w, i) => (WIDTH[w] = res.w[i])); SPACE = res.sp + 6;
+}
 const tag = VERTICAL ? "9x16" : "16x9";
 if (args.includes("--stills")) {
   mkdirSync(join(outDir, `stills-${tag}`), { recursive: true });
