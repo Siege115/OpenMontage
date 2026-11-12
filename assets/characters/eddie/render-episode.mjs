@@ -131,6 +131,7 @@ if (NARRATION) {
 }
 const TOTAL = BEATS[BEATS.length - 1].start + BEATS[BEATS.length - 1].dur;
 console.log(`narration ${TOTAL.toFixed(1)}s, ${BEATS.length} beats`);
+writeFileSync(join(outDir, only ? `timeline-${only}.json` : "timeline.json"), JSON.stringify(BEATS.map(({ idx, start, dur, pose, text, scene }) => ({ idx, start, dur, pose, scene: scene?.name, text })), null, 1));
 
 // caption chunks: 1-3 words, break after punctuation
 for (const b of BEATS) {
@@ -502,5 +503,5 @@ for (let f = 0; f < frames; f++) {
 ff.stdin.end();
 await new Promise((r) => ff.on("close", r));
 await browser.close();
-writeFileSync(join(outDir, "timeline.json"), JSON.stringify(BEATS.map(({ start, dur, pose, text, scene, shots }) => ({ start, dur, pose, scene: scene?.name, shots: shots.map((x) => x.type), text })), null, 1));
+
 console.log("wrote", out, `${TOTAL.toFixed(1)}s`, TITLE);
