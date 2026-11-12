@@ -84,6 +84,13 @@ function leg(H, spec, side) {
 // ---------- head + faces ----------
 
 const FACES = {
+  wrecked: `
+    <path d="M-25,-7 L-8,-3 M25,-9 L9,-4" stroke="${P.ink}" stroke-width="3.6" stroke-linecap="round"/>
+    <circle cx="-14" cy="6" r="10" fill="${P.paper}" stroke="${P.ink}" stroke-width="3"/><circle cx="14" cy="6" r="11" fill="${P.paper}" stroke="${P.ink}" stroke-width="3"/>
+    <path d="M-21,3 l4,2 M-8,10 l-4,-1 M20,2 l-4,3 M8,11 l4,-2 M-19,10 l3,-1 M21,11 l-4,-1" stroke="#e0433a" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="-13" cy="7" r="2.2" fill="${P.ink}"/><circle cx="15" cy="5" r="2.2" fill="${P.ink}"/>
+    <path d="M-25,15 Q-14,23 -4,15 M4,16 Q15,24 26,15" fill="none" stroke="#6f6f7c" stroke-width="3" stroke-linecap="round"/>
+    <path d="M-9,29 L-5,25 L-1,29 L3,25 L7,29 L10,26" fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
   blink: `
     <path d="M-19,6 L-9,6 M9,6 L19,6" stroke="${P.ink}" stroke-width="3.6" stroke-linecap="round"/>
     <path d="M-7,25 Q0,29 7,25" fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round"/>`,
