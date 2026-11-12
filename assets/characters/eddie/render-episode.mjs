@@ -166,6 +166,7 @@ BEATS.forEach((b, i) => {
   if (["shocked", "scared", "panic"].includes(b.pose)) events.push([b.start + 0.02, "thud", 0.9]);
   if (["celebrate", "idea"].includes(b.pose)) events.push([b.start + 0.05, "boing", 0.6]);
   if (b.blackout) events.push([b.start + 1.6, "thud", 0.7]);
+  for (const it of b.items ?? []) if (it.delay !== undefined) events.push([b.start + it.delay, "pop", 0.45]);
 });
 const mix = new Float32Array(Math.ceil((TOTAL + 1) * 44100)); // sfx
 for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
@@ -204,6 +205,7 @@ const resolved = BEATS.map((b) => resolvePose({ ...POSE_LIB[b.pose], ...(b.expr 
 const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const ink = PALETTE.ink;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const PEOPLE_CACHE = {};
 const NO_BLINK = new Set(["calm", "strain", "blink"]);
 const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stand", "idea", "celebrate", "hustle"]);
 
@@ -217,7 +219,9 @@ function placement(b, lt) {
 for (const [i, b] of BEATS.entries()) {
   const n = Math.max(1, Math.round(b.dur / 2.1));
   const classroom = b.scene?.name === "classroom";
+  const thoughts = (b.items ?? []).some((it) => it.type === "thought");
   const pool = classroom ? (VERTICAL ? ["board", "medium"] : ["wide", "push"])
+    : thoughts && !VERTICAL ? ["wide", "push"]
     : (b.card && !VERTICAL) || b.items?.length ? ["wide", "medium"] : ["wide", "medium", "close"];
   const changed = i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b);
   b.shots = [];
@@ -298,8 +302,33 @@ function frameSVG(t) {
   const sc = b.scene ? SCENES[b.scene.name](b.scene, tc) : SCENES.studio({}, tc);
   const shot = b.shots.find((s) => lt < s.e) ?? b.shots[b.shots.length - 1];
   const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0);
+  // vertical: pan to whoever's thought just popped up (the bubbles are the story)
+  const tItems = (b.items ?? []).filter((it) => it.type === "thought" && it.delay !== undefined);
+  if (VERTICAL && tItems.length) {
+    const shown = tItems.filter((it) => lt >= it.delay);
+    const tgt = (k) => (k < 0 ? cx : tItems[k].x);
+    const cur = shown.length - 1, since = cur >= 0 ? lt - tItems[cur].delay : lt;
+    const from = tgt(cur - 1), to = tgt(cur), e = ease(Math.min(1, since / 0.35));
+    const vw = OW / (BASE * 1.05);
+    cam.s = BASE * 1.05; cam.fy = H / 2 - 40;
+    cam.fx = Math.min(W - vw / 2, Math.max(vw / 2, from + (to - from) * e));
+  }
   let world = `<g filter="url(#dof)">${sc.bg}</g>`;
-  for (const it of b.items ?? []) world += `<g transform="translate(${it.x},${it.y}) scale(${it.scale ?? 1.4})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
+  // background people (other stick figures), then props / thought bubbles that pop in on cue
+  for (const [pi, pp] of (b.people ?? []).entries()) {
+    const key = JSON.stringify(pp);
+    const base = (PEOPLE_CACHE[key] ??= resolvePose({ ...POSE_LIB[pp.pose ?? "stand"], ...(pp.expr ? { expr: pp.expr } : {}), acc: pp.acc }));
+    const q = { ...base, lift: base.lift + Math.sin((tc + pi) * 2 * Math.PI * 0.5) * 3, headTilt: base.headTilt + Math.sin(tc * 0.8 + pi * 2) * 3 };
+    if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
+    const ps = SCALE * (pp.s ?? 0.92), ppy = GROUND - (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130) * ps;
+    world += `<ellipse cx="${pp.x}" cy="${GROUND + 4}" rx="${90 * (pp.s ?? 0.92)}" ry="10" fill="rgba(0,0,0,0.12)"/>`;
+    world += `<g transform="translate(${pp.x},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g>`;
+  }
+  for (const it of b.items ?? []) {
+    if (it.delay && lt < it.delay) continue;
+    const pop = it.delay !== undefined ? 1 + 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.15) - 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.06) : 1;
+    world += `<g transform="translate(${it.x},${it.y}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
+  }
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 4}" rx="${110 - pose.lift}" ry="12" fill="rgba(0,0,0,0.14)"/>`;
   const footY = POSE_LIB[b.pose].sit ? py : GROUND;
   world += `<g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g>`;

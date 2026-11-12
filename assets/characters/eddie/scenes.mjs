@@ -123,23 +123,29 @@ export const SCENES = {
   },
 
   // ---------------------------------------------------------------- night street
-  street({} = {}, t = 0) {
-    let bg = `<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27304f"/><stop offset="1" stop-color="#55628f"/></linearGradient></defs>
-      <rect width="${W}" height="${FLOOR}" fill="url(#sky)"/>`;
-    for (let i = 0; i < 26; i++) { const tw = 0.5 + 0.5 * Math.sin(t * 1.7 + i * 2.1); bg += `<circle cx="${(i * 173) % W}" cy="${40 + ((i * 89) % 300)}" r="${1.5 + tw * 2}" fill="#fff" opacity="${0.4 + tw * 0.6}"/>`; }
-    bg += `<circle cx="1640" cy="140" r="60" fill="#f6f1d8" ${o(4)}/><circle cx="1620" cy="125" r="10" fill="#e6dfbf"/><circle cx="1660" cy="160" r="7" fill="#e6dfbf"/>`;
+  street({ day = false } = {}, t = 0) {
+    const sky = day ? ["#8fc8f0", "#d6eefb"] : ["#27304f", "#55628f"];
+    let bg = `<defs><linearGradient id="sky${day ? "d" : "n"}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs>
+      <rect width="${W}" height="${FLOOR}" fill="url(#sky${day ? "d" : "n"})"/>`;
+    if (day) {
+      bg += `<circle cx="1640" cy="150" r="70" fill="#ffe27a" ${o(4)}/>`;
+      for (const [x, y, k] of [[300, 140, 1], [900, 90, 0.8], [1250, 200, 0.6]]) bg += `<g transform="translate(${x + ((t * 12) % 200)},${y}) scale(${k})"><ellipse rx="110" ry="38" fill="#fff"/><ellipse cx="-50" cy="-18" rx="55" ry="40" fill="#fff"/><ellipse cx="40" cy="-26" rx="60" ry="45" fill="#fff"/></g>`;
+    } else {
+      for (let i = 0; i < 26; i++) { const tw = 0.5 + 0.5 * Math.sin(t * 1.7 + i * 2.1); bg += `<circle cx="${(i * 173) % W}" cy="${40 + ((i * 89) % 300)}" r="${1.5 + tw * 2}" fill="#fff" opacity="${0.4 + tw * 0.6}"/>`; }
+      bg += `<circle cx="1640" cy="140" r="60" fill="#f6f1d8" ${o(4)}/><circle cx="1620" cy="125" r="10" fill="#e6dfbf"/><circle cx="1660" cy="160" r="7" fill="#e6dfbf"/>`;
+    }
     const house = (x, w, h, col, lit) => {
       let s = `<rect x="${x}" y="${FLOOR - h}" width="${w}" height="${h}" fill="${col}" ${o(5)}/><path d="M${x - 20},${FLOOR - h} L${x + w / 2},${FLOOR - h - 110} L${x + w + 20},${FLOOR - h} Z" fill="#5a4a5e" ${o(5)}/>`;
       for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
         const on = lit && r === 0 && c === 1;
-        s += `<rect x="${x + 30 + c * (w - 120)}" y="${FLOOR - h + 40 + r * 110}" width="60" height="70" fill="${on ? "#ffe39a" : "#2d3554"}" ${o(4)}/>`;
+        s += `<rect x="${x + 30 + c * (w - 120)}" y="${FLOOR - h + 40 + r * 110}" width="60" height="70" fill="${day ? "#cfe9f7" : on ? "#ffe39a" : "#2d3554"}" ${o(4)}/>`;
       }
       return s + `<rect x="${x + w / 2 - 30}" y="${FLOOR - 120}" width="60" height="120" fill="#6b5a4a" ${o(4)}/>`;
     };
     bg += house(60, 360, 300, "#8a7fa8", false) + house(520, 300, 260, "#7f9cb0", false) + house(1330, 360, 320, "#a88f7f", true) + house(1740, 260, 250, "#7fa895", false);
-    bg += glow(1390 + 120, 250, 140, "#ffe39a", 0.35);
+    if (!day) bg += glow(1390 + 120, 250, 140, "#ffe39a", 0.35);
     // street lamp
-    bg += `<path d="M1080,${FLOOR} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="#ffe39a" ${o(4)}/>` + glow(1170, 450, 330, "#ffe39a", 0.4);
+    bg += `<path d="M1080,${FLOOR} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="${day ? "#eee" : "#ffe39a"}" ${o(4)}/>` + (day ? "" : glow(1170, 450, 330, "#ffe39a", 0.4));
     bg += `<rect x="0" y="${FLOOR}" width="${W}" height="70" fill="#9aa0ad"/><path d="M0,${FLOOR} L${W},${FLOOR} M0,${FLOOR + 70} L${W},${FLOOR + 70}" ${o(5)}/><rect x="0" y="${FLOOR + 70}" width="${W}" height="200" fill="#4b4f5c"/>`;
     for (let x = 40; x < W; x += 260) bg += `<rect x="${x}" y="${FLOOR + 140}" width="140" height="14" rx="6" fill="#e8e3c8"/>`;
     return { bg, fg: "" };
@@ -171,6 +177,26 @@ export const SCENES = {
     bg += `<g transform="translate(140,${FLOOR - 60})"><path d="M0,0 L0,-90 Q20,-110 90,-115 L150,-185 Q190,-205 300,-200 Q360,-195 400,-120 L480,-110 Q510,-100 510,-60 L510,0 Z" fill="#d9776c" ${o(6)}/>
       <path d="M165,-120 L200,-175 Q230,-185 290,-182 L330,-120 Z" fill="#9cc3e6" ${o(4)}/><circle cx="110" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="110" cy="0" r="18" fill="#9aa0ad"/><circle cx="410" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="410" cy="0" r="18" fill="#9aa0ad"/>
       <rect x="490" y="-95" width="26" height="22" rx="6" fill="#ffe39a" ${o(3)}/></g>` + glow(700, FLOOR - 120, 260, "#ffe39a", 0.45);
+    return { bg, fg: "" };
+  },
+
+  // ---------------------------------------------------------------- cafe
+  cafe({ busy = true } = {}, t = 0) {
+    let bg = `<rect width="${W}" height="${FLOOR}" fill="#f3dcc2"/><rect y="560" width="${W}" height="${FLOOR - 560}" fill="#e6c7a6"/><path d="M0,560 L${W},560" stroke="#c9a582" stroke-width="8"/>`;
+    // menu board + window
+    bg += `<rect x="1230" y="120" width="520" height="300" rx="12" fill="#2f3a35" ${o(6)}/><g fill="#f4f4ee" font-size="40" font-family="InkHand, sans-serif">
+      <text x="1490" y="185" text-anchor="middle" font-size="56">MENU</text><text x="1280" y="250">coffee .......... 3</text><text x="1280" y="305">tea ............... 2</text><text x="1280" y="360">cake .............. 4</text></g>`;
+    bg += windowFrame(160, 150, 420, 280, false, t);
+    // pendant lamps
+    for (const x of [760, 1060]) bg += `<path d="M${x},0 L${x},170" ${o(4)}/><path d="M${x - 50},230 L${x + 50},230 L${x + 30},170 L${x - 30},170 Z" fill="#8fb3a0" ${o(5)}/>` + glow(x, 260, 180, "#ffd98a", 0.45);
+    bg += floorBoards("#b98a63", "#a5764f");
+    // counter with espresso machine (right)
+    bg += `<rect x="1300" y="620" width="560" height="250" fill="#8a5a3c" ${o(6)}/><rect x="1280" y="600" width="600" height="30" rx="6" fill="#c99b72" ${o(5)}/>
+      <rect x="1520" y="470" width="190" height="130" rx="14" fill="#b9bcc6" ${o(5)}/><rect x="1555" y="500" width="120" height="40" rx="6" fill="#2b2f3a" ${o(3)}/><path d="M1580,600 L1580,560 M1650,600 L1650,560" ${o(5)}/>
+      <rect x="1360" y="555" width="60" height="45" rx="6" fill="#fff" ${o(4)}/>`;
+    // table + cups (left)
+    bg += `<ellipse cx="420" cy="720" rx="190" ry="34" fill="#c99b72" ${o(5)}/><path d="M420,750 L420,860 M360,870 L480,870" ${o(7)}/>
+      <rect x="370" y="676" width="44" height="40" rx="6" fill="#fff" ${o(4)}/><rect x="450" y="680" width="40" height="36" rx="6" fill="#f0b27a" ${o(4)}/>`;
     return { bg, fg: "" };
   },
 

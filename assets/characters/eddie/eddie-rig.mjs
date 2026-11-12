@@ -142,7 +142,16 @@ const TALK = [
   `<ellipse cx="0" cy="26" rx="7" ry="5" fill="${P.ink}"/>`,
   `<path d="M-12,20 Q0,18 12,20 Q11,36 0,37 Q-11,36 -12,20 Z" fill="${P.ink}"/><path d="M-6,32 Q0,28 6,32 Q3,36 0,36 Q-3,36 -6,32 Z" fill="${P.grey}"/>`,
 ];
-export function head(expr = "neutral", mouth = 0) {
+// Accessories so background people read as different characters (Eddie stays bald).
+const ACC = {
+  cap: (c = "#e5584f") => `<path d="M-50,-14 Q-50,-62 0,-62 Q50,-62 50,-14 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/><path d="M8,-16 L74,-14 Q78,-6 70,-4 L6,-6 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>`,
+  bun: (c = "#3a2a20") => `<circle cx="0" cy="-66" r="17" fill="${c}" stroke="${P.ink}" stroke-width="4"/><path d="M-50,-4 Q-52,-58 0,-60 Q52,-58 50,-4 Q36,-38 0,-40 Q-36,-38 -50,-4 Z" fill="${c}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>`,
+  glasses: () => `<g fill="rgba(255,255,255,.25)" stroke="${P.ink}" stroke-width="4"><circle cx="-17" cy="10" r="13"/><circle cx="17" cy="10" r="13"/></g><path d="M-4,8 Q0,4 4,8 M-30,8 L-48,2 M30,8 L48,2" fill="none" stroke="${P.ink}" stroke-width="4"/>`,
+  beanie: (c = "#5b8fd9") => `<path d="M-52,-8 Q-54,-66 0,-66 Q54,-66 52,-8 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5"/><rect x="-54" y="-18" width="108" height="16" rx="6" fill="${c}" stroke="${P.ink}" stroke-width="4"/><circle cx="0" cy="-70" r="10" fill="${c}" stroke="${P.ink}" stroke-width="4"/>`,
+  pigtails: (c = "#3a2a20") => `<circle cx="-56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><circle cx="56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><path d="M-50,-6 Q-52,-60 0,-60 Q52,-60 50,-6 Q30,-36 0,-34 Q-30,-36 -50,-6 Z" fill="${c}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>`,
+};
+
+export function head(expr = "neutral", mouth = 0, acc = null) {
   let face = FACES[expr] || FACES.neutral;
   if (mouth > 0) {
     const els = face.match(/<[^>]+\/>/g) || [];
@@ -151,7 +160,8 @@ export function head(expr = "neutral", mouth = 0) {
   return (
     `<path d="M0,-58 C34,-58 52,-30 51,2 C50,34 30,54 0,54 C-30,54 -50,34 -51,2 C-52,-30 -34,-58 0,-58 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="4.5"/>` +
     `<path d="M-32,-34 Q-24,-44 -12,-47" fill="none" stroke="${P.grey}" stroke-width="3" stroke-linecap="round"/>` +
-    `<g transform="translate(0,4) scale(1.22)">${face}</g>`
+    `<g transform="translate(0,4) scale(1.22)">${face}</g>` +
+    (acc ? (Array.isArray(acc) ? acc : [acc]).map((a) => { const [k, c] = a.split(":"); return ACC[k]?.(c) ?? ""; }).join("") : "")
   );
 }
 
@@ -193,6 +203,19 @@ export const PROPS = {
         <path d="M${x - 8},${y - r * 1.6} L${x},${y - r * 1.9} L${x + 8},${y - r * 1.6}" fill="none" stroke="${P.ink}" stroke-width="4" stroke-linecap="round"/>`;
     }
     return g + `</g>`;
+  },
+  thought: (o, a = {}) => {
+    const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
+    const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 70, h = lines.length * 44 + 46;
+    let bumps = "";
+    const n = Math.max(5, Math.round(w / 55));
+    for (let i = 0; i < n; i++) { const ang = (i / n) * Math.PI * 2; bumps += `<circle cx="${f(Math.cos(ang) * w * 0.48)}" cy="${f(Math.sin(ang) * h * 0.5)}" r="${f(Math.min(w, h) * 0.24)}"/>`; }
+    return `<g transform="translate(${o[0]},${o[1]})">
+      <g fill="${P.paper}" stroke="${P.ink}" stroke-width="9">${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/></g>
+      <g fill="${P.paper}">${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/></g>
+      <circle cx="${tail * w * 0.32}" cy="${h / 2 + 26}" r="11" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>
+      <circle cx="${tail * w * 0.4}" cy="${h / 2 + 52}" r="7" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>` +
+      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="38" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
   },
   // ---- scene props (o = position relative to the pelvis) ----
   zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
@@ -261,7 +284,7 @@ export function character(pose) {
     g += arm(S, armL);
     if (!pose.overHead) g += arm(S, armR);
   }
-  g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr, pose.mouth ?? 0)}</g>`;
+  g += `<g transform="translate(${pt(H)}) rotate(${f(lean + (pose.headTilt ?? 0))})">${head(pose.expr, pose.mouth ?? 0, pose.acc)}</g>`;
   if (pose.overHead) g += arm(S, pose.overHead);
   if (pose.frontArms) g += arm(S, armL) + arm(S, armR);
   for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);

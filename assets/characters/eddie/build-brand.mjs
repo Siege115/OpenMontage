@@ -4,7 +4,7 @@ import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { character, head, resolvePose, POSES } from "./eddie-rig.mjs";
+import { character, head, resolvePose, POSES, PROPS } from "./eddie-rig.mjs";
 import { SCENES } from "./scenes.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +43,33 @@ const items = {
       <g transform="scale(${1280 / 1920})">${eddie(pose("lieAwake", { expr: "shocked" }), 470, 690, 1.85)}
       <path d="M330,640 Q520,600 700,650 L700,800 Q480,820 300,800 Z" fill="#7fa7d9" stroke="#111" stroke-width="5"/></g>
       ${outline("0 HOURS", 900, 330, 120)}${outline("OF SLEEP", 900, 460, 100, "#ffd84d")}`],
+  // ---------------- Episode 2: What If You Could Hear Everyone's Thoughts?
+  // A — series look: Day 1 one sweet thought vs Day 30 drowning in thoughts
+  "ep02-thumb-A-day1-vs-day30": [1280, 720, () => {
+    const bub = (t, x, y, s = 1, tail = -1) => `<g transform="translate(${x},${y}) scale(${s})">${PROPS.thought([0, 0], { t, tail })}</g>`;
+    return `<clipPath id="l"><rect width="640" height="720"/></clipPath><clipPath id="r"><rect x="640" width="640" height="720"/></clipPath>
+      <g clip-path="url(#l)">${world(SCENES.studio({ tone: "#fbe7a1" }, 0).bg)}</g>
+      <g clip-path="url(#r)">${world(SCENES.studio({ tone: "#f6c9c4" }, 0).bg)}</g>
+      ${eddie(pose("celebrate"), 300, 450, 1.55)}${bub("nice shirt!", 505, 95, 1.05)}
+      <g clip-path="url(#r)">${eddie(pose("panic", { expr: "wrecked" }), 960, 470, 1.55)}
+      ${bub("liar", 760, 110, 1.1, 1)}${bub("so boring…", 1150, 90, 1.1)}${bub("rent!!", 1180, 300, 1.1)}${bub("ugh", 740, 330, 1.1, 1)}${bub("is it lunch?", 1100, 490, 1)}</g>
+      <path d="M640,0 L640,720" stroke="#000" stroke-width="12"/>
+      ${tag("DAY 1", 40, 590, 250, "#3fb56b")}${tag("DAY 30", 940, 590, 300)}`;
+  }],
+  // B — the smile vs the thought
+  "ep02-thumb-B-smile-vs-thought": [1280, 720, () => `${world(SCENES.living({}, 0).bg)}
+      <g transform="scale(${1280 / 1920})">${eddie(pose("shocked"), 560, 630, 1.85)}${eddie(pose("stand", { expr: "happy", acc: "bun" }), 1260, 650, 1.85)}
+      <g transform="translate(1250,130) scale(1.8)">${PROPS.thought([0, 0], { t: "that wasn't funny.", tail: -1 })}</g></g>
+      ${outline("SHE'S LYING", 330, 660, 92)}`],
+  // C — sensory overload close-up
+  "ep02-thumb-C-too-loud": [1280, 720, () => {
+    const words = ["milk, eggs", "LIAR", "so tired", "rent!!", "lunch?", "ugh Monday", "♪ la la ♪"];
+    const pos = [[180, 120], [1080, 110], [160, 330], [1110, 320], [230, 540], [1060, 540], [640, 70], [420, 640], [880, 650]];
+    return `<rect width="1280" height="720" fill="#f6c9c4"/><circle cx="640" cy="380" r="330" fill="#fbe0dc"/>
+      ${words.map((w, i) => `<g transform="translate(${pos[i][0]},${pos[i][1]}) scale(1.05)">${PROPS.thought([0, 0], { t: w, tail: pos[i][0] < 640 ? 1 : -1 })}</g>`).join("")}
+      <g transform="translate(640,400) scale(4.6)">${head("wrecked")}</g>
+      ${outline("TOO LOUD", 640, 700, 96, "#ffd84d")}`;
+  }],
   // channel profile picture (crops to a circle)
   "profile-800": [800, 800, () => `<rect width="800" height="800" fill="#ffd84d"/><circle cx="400" cy="400" r="330" fill="#fff4c2"/>
       <g transform="translate(400,420) scale(5.2) rotate(-4)">${head("happy", 2)}</g>`],
@@ -59,14 +86,16 @@ const items = {
 };
 
 const black = readFileSync(join(here, "montserrat-900.woff2")).toString("base64");
+const hand = readFileSync(join(here, "../../../ink-theater/assets/patrickhand.ttf")).toString("base64");
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const browser = await chromium.launch();
 for (const [name, [w, h, fn]] of Object.entries(items)) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
   await page.setContent(`<html><head><style>@font-face{font-family:MBlack;font-weight:900;src:url(data:font/woff2;base64,${black}) format("woff2");}
+    @font-face{font-family:InkHand;src:url(data:font/ttf;base64,${hand}) format("truetype");}
     body{margin:0}</style></head><body><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${fn()}</svg></body></html>`);
-  await page.evaluate(() => document.fonts.load("900 40px MBlack"));
+  await page.evaluate(() => Promise.all([document.fonts.load("900 40px MBlack"), document.fonts.load("40px InkHand")]));
   await page.screenshot({ path: join(out, `${name}.png`) });
   await page.close();
 }
