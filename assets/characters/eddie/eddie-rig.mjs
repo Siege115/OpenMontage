@@ -46,22 +46,40 @@ function limb(root, spec, l1, l2) {
 }
 
 const angleOf = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180) / Math.PI;
-const stick = (pts) =>
-  `<path d="M${pts.map(pt).join(" L")}" fill="none" stroke="${P.ink}" stroke-width="${LIMB}" stroke-linecap="round" stroke-linejoin="round"/>`;
+// Smooth, slightly tapered limb through 2-3 points (a quadratic curve bends at the joint),
+// with a soft highlight on the lit (upper-left) side for a touch of volume.
+function stick(pts, w0 = LIMB + 1.5, w1 = LIMB - 0.5) {
+  const [A, B, Cc] = pts.length === 3 ? pts : [pts[0], [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2], pts[1]];
+  const ctrl = [2 * B[0] - (A[0] + Cc[0]) / 2, 2 * B[1] - (A[1] + Cc[1]) / 2];
+  const bez = (t) => [(1 - t) ** 2 * A[0] + 2 * (1 - t) * t * ctrl[0] + t * t * Cc[0], (1 - t) ** 2 * A[1] + 2 * (1 - t) * t * ctrl[1] + t * t * Cc[1]];
+  const N = 14, L = [], R = [], mid = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, p0 = bez(Math.max(0, t - 0.01)), p1 = bez(Math.min(1, t + 0.01)), p = bez(t);
+    let nx = -(p1[1] - p0[1]), ny = p1[0] - p0[0]; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    const w = (w0 + (w1 - w0) * t) / 2;
+    L.push([p[0] + nx * w, p[1] + ny * w]); R.push([p[0] - nx * w, p[1] - ny * w]); mid.push([p[0] - nx * w * 0.35 - 0.6, p[1] - ny * w * 0.35 - 0.6]);
+  }
+  const poly = "M" + L.map(pt).join(" L") + " L" + R.reverse().map(pt).join(" L") + " Z";
+  return `<path d="${poly}" fill="${P.ink}"/><circle cx="${f(A[0])}" cy="${f(A[1])}" r="${f(w0 / 2)}" fill="${P.ink}"/><circle cx="${f(Cc[0])}" cy="${f(Cc[1])}" r="${f(w1 / 2)}" fill="${P.ink}"/>` +
+    `<path d="M${mid.slice(1, -1).map(pt).join(" L")}" fill="none" stroke="#5a5a68" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>`;
+}
+const SKIN_DEFS = `<defs><radialGradient id="skinShade" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".72" stop-color="#f7f7fa"/><stop offset="1" stop-color="#dcdce4"/></radialGradient></defs>`;
 
 // ---------- body parts ----------
 
 function arm(S, spec) {
   const [E, W] = limb(S, spec, LEN.upper, LEN.fore);
   const fa = angleOf(E, W);
-  const hand = add(W, dir(fa), 6);
-  let s = stick([S, E, W]);
-  const thumb = add(hand, dir(fa + (spec.thumb ?? 90)), 8);
-  s += `<circle cx="${f(thumb[0])}" cy="${f(thumb[1])}" r="4.2" fill="${P.paper}" stroke="${P.ink}" stroke-width="3.2"/>`;
-  s += `<circle cx="${f(hand[0])}" cy="${f(hand[1])}" r="9" fill="${P.paper}" stroke="${P.ink}" stroke-width="3.4"/>`;
-  if (spec.fist) {
-    const kn = add(hand, dir(fa), 3.5);
-    s += `<path d="M${pt(add(kn, dir(fa + 90), 5))} L${pt(add(kn, dir(fa - 90), 5))}" stroke="${P.ink}" stroke-width="2" stroke-linecap="round"/>`;
+  const hand = add(W, dir(fa), 7);
+  let s = stick([S, E, W], LIMB + 1.2, LIMB - 0.8);
+  // hand: shaded mitten oriented along the forearm, thumb, finger creases
+  const thumb = add(add(hand, dir(fa + (spec.thumb ?? 90)), 8), dir(fa), -2);
+  s += `<ellipse cx="${f(thumb[0])}" cy="${f(thumb[1])}" rx="5" ry="3.8" transform="rotate(${f(-(fa + (spec.thumb ?? 90)) + 90)},${f(thumb[0])},${f(thumb[1])})" fill="url(#skinShade)" stroke="${P.ink}" stroke-width="3"/>`;
+  s += `<ellipse cx="${f(hand[0])}" cy="${f(hand[1])}" rx="9.5" ry="11" transform="rotate(${f(-fa)},${f(hand[0])},${f(hand[1])})" fill="url(#skinShade)" stroke="${P.ink}" stroke-width="3.2"/>`;
+  const kn = add(hand, dir(fa), spec.fist ? 3 : 5);
+  for (const o of spec.fist ? [-3.5, 0, 3.5] : [-2.5, 2.5]) {
+    const a = add(add(kn, dir(fa + 90), o), dir(fa), -2), b = add(add(kn, dir(fa + 90), o), dir(fa), 3);
+    s += `<path d="M${pt(a)} L${pt(b)}" stroke="${P.ink}" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>`;
   }
   return s;
 }
@@ -69,16 +87,18 @@ function arm(S, spec) {
 function shoe(A, side, rot = 0) {
   return (
     `<g transform="translate(${pt(A)}) rotate(${f(rot)}) scale(${side * 0.85},0.85)">` +
-    `<path d="M-12,-7 L6,-9 Q22,-7 28,3 Q30,12 21,13 L-13,13 Q-18,13 -17,4 Z" fill="${P.ink}" stroke="${P.ink}" stroke-width="3.5" stroke-linejoin="round"/>` +
-    `<path d="M15,-3 Q26,0 28,7 L17,8 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="2.5" stroke-linejoin="round"/>` +
-    `<path d="M-16,8.5 L28,8.5" stroke="${P.paper}" stroke-width="3" stroke-linecap="round"/>` +
+    `<path d="M-12,-7 L6,-9 Q22,-7 28,3 Q30,12 21,13 L-13,13 Q-18,13 -17,4 Z" fill="#26262e" stroke="${P.ink}" stroke-width="3.5" stroke-linejoin="round"/>` +
+    `<path d="M-8,-5 Q4,-8 14,-4" fill="none" stroke="#5a5a68" stroke-width="2" stroke-linecap="round"/>` +
+    `<path d="M15,-3 Q26,0 28,7 L17,8 Z" fill="#f2f2f5" stroke="${P.ink}" stroke-width="2.5" stroke-linejoin="round"/>` +
+    `<path d="M-17,8 L28,8 Q30,12 21,13 L-13,13 Q-18,13 -17,8 Z" fill="#e6e6ec" stroke="${P.ink}" stroke-width="2"/>` +
+    `<path d="M0,-6 L5,-1 M4,-7 L9,-2 M8,-7 L12,-3" stroke="#f2f2f5" stroke-width="1.6" stroke-linecap="round"/>` +
     `</g>`
   );
 }
 
 function leg(H, spec, side) {
   const [K, A] = limb(H, spec, LEN.thigh, LEN.shin);
-  return stick([H, K, A]) + shoe(add(A, dir(angleOf(K, A)), 3), side, spec.shoeRot ?? 0);
+  return stick([H, K, A], LIMB + 2, LIMB - 0.5) + shoe(add(A, dir(angleOf(K, A)), 3), side, spec.shoeRot ?? 0);
 }
 
 // ---------- head + faces ----------
@@ -151,15 +171,35 @@ const ACC = {
   pigtails: (c = "#3a2a20") => `<circle cx="-56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><circle cx="56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><path d="M-50,-6 Q-52,-60 0,-60 Q52,-60 50,-6 Q30,-36 0,-34 Q-30,-36 -50,-6 Z" fill="${c}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>`,
 };
 
+// Parametric talking mouth: open 0..1, shape "neutral" | "wide" | "round".
+function talkMouth(open, shape = "neutral") {
+  const w = { neutral: 19, wide: 24, round: 12 }[shape] ?? 19, h = 2 + open * 18, y = 23;
+  if (open < 0.08) return `<path d="M${-w / 2},${y} Q0,${y + 3} ${w / 2},${y}" fill="none" stroke="${P.ink}" stroke-width="3.2" stroke-linecap="round"/>`;
+  let s = `<path d="M${-w / 2},${y} C${-w / 2},${y + h * 1.25} ${w / 2},${y + h * 1.25} ${w / 2},${y} Q0,${y - 2.5} ${-w / 2},${y} Z" fill="#3a1d22" stroke="${P.ink}" stroke-width="2.6" stroke-linejoin="round"/>`;
+  if (open > 0.3) s += `<path d="M${-w / 2 + 3},${y + 0.5} Q0,${y - 1} ${w / 2 - 3},${y + 0.5} L${w / 2 - 4},${y + 3.5} Q0,${y + 2} ${-w / 2 + 4},${y + 3.5} Z" fill="#fff"/>`;
+  if (open > 0.4) s += `<ellipse cx="0" cy="${y + h * 0.82}" rx="${w * 0.28}" ry="${h * 0.22}" fill="#e3747c"/>`;
+  return s;
+}
+// add a white shine to every dark pupil/eye of a face
+const glints = (face) => face.replace(/<(ellipse|circle) cx="(-?[\d.]+)" cy="(-?[\d.]+)" (?:rx="([\d.]+)" ry="[\d.]+"|r="([\d.]+)") fill="\$\{P\.ink\}"\/>|<(ellipse|circle) cx="(-?[\d.]+)" cy="(-?[\d.]+)" (?:rx="([\d.]+)" ry="[\d.]+"|r="([\d.]+)") fill="#111114"\/>/g, (m, t1, x1, y1, rx1, r1, t2, x2, y2, rx2, r2) => {
+  const x = +(x1 ?? x2), y = +(y1 ?? y2), r = +(rx1 ?? r1 ?? rx2 ?? r2);
+  if (r > 6 || y > 15) return m;
+  return m + `<circle cx="${x + r * 0.35}" cy="${y - r * 0.45}" r="${Math.max(1, r * 0.32)}" fill="#fff"/>`;
+});
+
 export function head(expr = "neutral", mouth = 0, acc = null) {
   let face = FACES[expr] || FACES.neutral;
-  if (mouth > 0) {
+  if (mouth && (typeof mouth === "object" || mouth > 0)) {
+    const m = typeof mouth === "object" ? mouth : { open: [0, 0.45, 0.85][mouth] ?? 0.5, shape: "neutral" };
     const els = face.match(/<[^>]+\/>/g) || [];
-    face = els.filter((e) => !isMouth(e)).join("") + TALK[mouth];
+    face = els.filter((e) => !isMouth(e)).join("") + talkMouth(m.open, m.shape);
   }
+  face = glints(face);
   return (
-    `<path d="M0,-58 C34,-58 52,-30 51,2 C50,34 30,54 0,54 C-30,54 -50,34 -51,2 C-52,-30 -34,-58 0,-58 Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="4.5"/>` +
-    `<path d="M-32,-34 Q-24,-44 -12,-47" fill="none" stroke="${P.grey}" stroke-width="3" stroke-linecap="round"/>` +
+    SKIN_DEFS +
+    `<path d="M0,-58 C34,-58 52,-30 51,2 C50,34 30,54 0,54 C-30,54 -50,34 -51,2 C-52,-30 -34,-58 0,-58 Z" fill="url(#skinShade)" stroke="${P.ink}" stroke-width="4.5"/>` +
+    `<path d="M-32,-34 Q-24,-44 -12,-47" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>` +
+    `<path d="M-30,40 Q0,52 30,40" fill="none" stroke="#c9c9d3" stroke-width="3" stroke-linecap="round" opacity=".7"/>` +
     `<g transform="translate(0,4) scale(1.22)">${face}</g>` +
     (acc ? (Array.isArray(acc) ? acc : [acc]).map((a) => { const [k, c] = a.split(":"); return ACC[k]?.(c) ?? ""; }).join("") : "")
   );
@@ -167,6 +207,7 @@ export function head(expr = "neutral", mouth = 0, acc = null) {
 
 // ---------- props / fx (all black & white) ----------
 
+const BUBBLE_DEFS = `<defs><linearGradient id="bubbleShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf1"/></linearGradient></defs>`;
 export const PROPS = {
   waveLines: (o) => `<g fill="none" stroke="${P.ink}" stroke-width="3" stroke-linecap="round">
     <path d="M${o[0] + 18},${o[1] - 16} Q${o[0] + 28},${o[1]} ${o[0] + 18},${o[1] + 16}"/>
@@ -206,31 +247,31 @@ export const PROPS = {
   },
   thought: (o, a = {}) => {
     const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
-    const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 70, h = lines.length * 44 + 46;
+    const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 80, h = lines.length * 44 + 52;
     let bumps = "";
-    const n = Math.max(5, Math.round(w / 55));
-    for (let i = 0; i < n; i++) { const ang = (i / n) * Math.PI * 2; bumps += `<circle cx="${f(Math.cos(ang) * w * 0.48)}" cy="${f(Math.sin(ang) * h * 0.5)}" r="${f(Math.min(w, h) * 0.24)}"/>`; }
-    return `<g transform="translate(${o[0]},${o[1]})">
-      <g fill="${P.paper}" stroke="${P.ink}" stroke-width="9">${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/></g>
-      <g fill="${P.paper}">${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/></g>
-      <circle cx="${tail * w * 0.32}" cy="${h / 2 + 26}" r="11" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>
-      <circle cx="${tail * w * 0.4}" cy="${h / 2 + 52}" r="7" fill="${P.paper}" stroke="${P.ink}" stroke-width="4"/>` +
-      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="38" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
+    const n = Math.max(6, Math.round(w / 50));
+    for (let i = 0; i < n; i++) { const ang = (i / n) * Math.PI * 2; bumps += `<circle cx="${f(Math.cos(ang) * w * 0.47)}" cy="${f(Math.sin(ang) * h * 0.47)}" r="${f(Math.min(w, h) * 0.25 + (i % 2) * 4)}"/>`; }
+    const body = `${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/>`;
+    return `<g transform="translate(${o[0]},${o[1]})">${BUBBLE_DEFS}
+      <g transform="translate(7,9)" fill="rgba(20,20,30,.22)">${body}</g>
+      <g fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="9">${body}</g><g fill="url(#bubbleShade)">${body}</g>
+      <circle cx="${tail * w * 0.3 + 4}" cy="${h / 2 + 30}" r="12" fill="rgba(20,20,30,.2)"/><circle cx="${tail * w * 0.3}" cy="${h / 2 + 26}" r="12" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="4"/>
+      <circle cx="${tail * w * 0.39}" cy="${h / 2 + 54}" r="7" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="3.5"/>
+      <path d="M${-w * 0.3},${-h * 0.32} Q${-w * 0.1},${-h * 0.46} ${w * 0.12},${-h * 0.4}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"/>` +
+      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="36" fill="#2a2a33" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
   },
   say: (o, a = {}) => {
     const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
-    const w = Math.max(...lines.map((l) => l.length)) * 20 + 60, h = lines.length * 46 + 34;
-    return `<g transform="translate(${o[0]},${o[1]})">
-      <path d="M${tail * w * 0.18},${h / 2 - 2} L${tail * w * 0.3},${h / 2 + 40} L${tail * w * 0.02},${h / 2 - 2} Z" fill="${P.paper}" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
-      <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="22" fill="${P.paper}" stroke="${P.ink}" stroke-width="5"/>
-      <path d="M${tail * w * 0.18 + 4 * tail},${h / 2 - 3} L${tail * w * 0.04},${h / 2 - 3}" stroke="${P.paper}" stroke-width="8"/>` +
-      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 46 + 14}" text-anchor="middle" font-size="40" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
+    const w = Math.max(...lines.map((l) => l.length)) * 20 + 64, h = lines.length * 46 + 38;
+    const tailPath = `M${tail * w * 0.12},${h / 2 - 4} Q${tail * w * 0.2},${h / 2 + 26} ${tail * w * 0.34},${h / 2 + 42} Q${tail * w * 0.26},${h / 2 + 12} ${tail * w * 0.3},${h / 2 - 4} Z`;
+    return `<g transform="translate(${o[0]},${o[1]})">${BUBBLE_DEFS}
+      <g transform="translate(7,9)" fill="rgba(20,20,30,.22)"><rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="${h * 0.42}"/><path d="${tailPath}"/></g>
+      <path d="${tailPath}" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+      <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="${h * 0.42}" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="5"/>
+      <path d="M${tail * w * 0.13},${h / 2 - 2.5} L${tail * w * 0.29},${h / 2 - 2.5}" stroke="#f2f3f7" stroke-width="7"/>
+      <path d="M${-w / 2 + h * 0.4},${-h / 2 + 9} L${w / 2 - h * 0.6},${-h / 2 + 9}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>` +
+      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 46 + 14}" text-anchor="middle" font-size="38" fill="#1b1b22" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
   },
-  chair: (o) => `<g transform="translate(${o[0]},${o[1]})">
-    <rect x="-80" y="-250" width="160" height="150" rx="22" fill="#5b6475" stroke="${P.ink}" stroke-width="5"/>
-    <rect x="-95" y="-110" width="190" height="32" rx="12" fill="#6f7a8d" stroke="${P.ink}" stroke-width="5"/>
-    <path d="M0,-78 L0,-30 M-70,-10 L70,-10 M0,-30 L-60,-10 M0,-30 L60,-10" fill="none" stroke="${P.ink}" stroke-width="7" stroke-linecap="round"/>
-    <circle cx="-70" cy="-6" r="8" fill="${P.ink}"/><circle cx="70" cy="-6" r="8" fill="${P.ink}"/></g>`,
   // ---- scene props (o = position relative to the pelvis) ----
   zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
     <text x="${o[0]}" y="${o[1]}" font-size="30">z</text><text x="${o[0] + 18}" y="${o[1] - 22}" font-size="40">z</text>
@@ -293,7 +334,7 @@ export function character(pose) {
   const legR = pose.legR ?? { a1: 10, a2: 4 };
 
   let g = leg([0, 0], legL, -1) + leg([0, 0], legR, 1);
-  g += stick([[0, 0], N]);
+  g += stick([[0, 0], add([0, 0], dir(180 - lean * 0.6), LEN.torso * 0.5), N], LIMB + 3, LIMB + 0.5);
   if (!pose.frontArms) {
     g += arm(S, armL);
     if (!pose.overHead) g += arm(S, armR);

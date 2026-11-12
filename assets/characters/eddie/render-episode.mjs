@@ -148,13 +148,25 @@ for (const b of BEATS) {
 // loudness envelope at character frame rate -> lip flaps
 const pcm = sh("ffmpeg", ["-v", "error", "-i", narration, "-f", "s16le", "-ac", "1", "-ar", "16000", "-"], { maxBuffer: 1 << 30 });
 const samples = new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.length / 2));
-const win = Math.floor(16000 / CFPS), env = [];
+const win = 160, env = []; // 10 ms windows
 for (let i = 0; i < samples.length; i += win) {
   let s = 0; for (let j = i; j < Math.min(samples.length, i + win); j++) s += samples[j] * samples[j];
   env.push(Math.sqrt(s / win));
 }
 const p95 = [...env].sort((a, b) => a - b)[Math.floor(env.length * 0.95)] || 1;
-const loud = (t) => Math.min(1, (env[Math.floor(t * CFPS)] ?? 0) / p95);
+// attack/release smoothing so the jaw moves like a jaw, not a switch
+const smooth = new Float32Array(env.length); { let v = 0; for (let i = 0; i < env.length; i++) { const x = Math.min(1.2, env[i] / p95); v += (x - v) * (x > v ? 0.6 : 0.22); smooth[i] = v; } }
+const loud = (t) => { const x = t * 100, i = Math.floor(x), fr = x - i; return Math.min(1, (smooth[i] ?? 0) * (1 - fr) + (smooth[i + 1] ?? 0) * fr); };
+// mouth state at beat-local time: openness from loudness, closed between words, shape from the word's vowels
+function mouthAt(b, lt, tAbs) {
+  const w = b.words.find((x) => lt >= x.s - 0.03 && lt <= x.e + 0.04);
+  let open = Math.pow(Math.max(0, (loud(tAbs) - 0.07) / 0.75), 0.85);
+  if (!w) open *= 0.15;
+  else if (/^[mbp]/i.test(w.w) && lt - w.s < 0.06) open *= 0.1; // lips together on m/b/p
+  const word = (w?.w ?? "").toLowerCase();
+  const shape = /oo|ou|ow|o[^a-z]|^o|w|u/.test(word) ? "round" : /ee|ea|i|y$/.test(word) ? "wide" : "neutral";
+  return { open: Math.min(1, open), shape };
+}
 
 // ---------- 2. audio mix: SFX + music bed ----------
 const sfxDir = join(outDir, "sfx"); mkdirSync(sfxDir, { recursive: true });
@@ -346,7 +358,7 @@ function frameSVG(t) {
   const blinking = !NO_BLINK.has(pose.expr) && ((tc + i * 0.7) % 3.4) < 0.13;
   if (blinking) pose.expr = "blink";
   // lip flaps while the narrator speaks
-  if (TALKERS.has(b.pose) && !blinking && speaking) pose.mouth = lv > 0.55 ? 2 : lv > 0.2 ? 1 : 0;
+  if (TALKERS.has(b.pose) && !blinking && speaking) pose.mouth = mouthAt(b, lt, tc);
 
   // squash & stretch on a pose snap (character frames 0..3)
   const qs = Math.min(1, ltc / 0.36);
@@ -374,6 +386,11 @@ function frameSVG(t) {
     cam.s = BASE * 1.05; cam.fy = H / 2 - 40;
     cam.fx = Math.min(W - vw / 2, Math.max(vw / 2, from + (to - from) * e));
   }
+  // characters pick up the scene's light: cool at night, warm at sunset, purple at the party
+  const sn = b.scene?.name, sopt = b.scene ?? {};
+  const light = (sn === "street" && !sopt.day) || (sn === "bedroom" && sopt.night) || (sn === "living" && sopt.night) || (sn === "desk" && sopt.night) || sn === "road" ? "night"
+    : sn === "rooftop" ? "sunset" : sn === "party" || sn === "concert" ? "party" : null;
+  const lightF = light ? `url(#lit-${light})` : "none";
   let world = `<g filter="url(#dof)">${sc.bg}</g>`;
   // background people (other stick figures), then props / thought bubbles that pop in on cue
   for (const [pi, pp] of (b.people ?? []).entries()) {
@@ -399,18 +416,23 @@ function frameSVG(t) {
     if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
     const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130) * ps;
     const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
-    world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 4}" rx="${90 * (pp.s ?? 0.92)}" ry="10" fill="rgba(0,0,0,0.12)"/>`;
-    world += `<g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g>`;
+    world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
+    world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
   }
-  for (const it of b.items ?? []) {
+  const isBubble = (it) => it.type === "thought" || it.type === "say";
+  const drawItems = (bubbles) => { let out = ""; for (const it of b.items ?? []) {
+    if (isBubble(it) !== bubbles) continue;
     if (it.delay && lt < it.delay) continue;
     const pop = it.delay !== undefined ? 1 + 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.15) - 0.25 * Math.max(0, 1 - (lt - it.delay) / 0.06) : 1;
-    world += `<g transform="translate(${it.x},${it.y}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
-  }
-  if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 4}" rx="${110 - pose.lift}" ry="12" fill="rgba(0,0,0,0.14)"/>`;
+    const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
+    out += `<g transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
+  } return out; };
+  world += drawItems(false);
+  if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
   const footY = POSE_LIB[b.pose].sit ? py : GROUND;
-  world += `<g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g>`;
+  world += `<g filter="${lightF}"><g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g></g>`;
   world += sc.fg;
+  world += drawItems(true); // speech/thought bubbles always on top
   if (b.blanket) world += `<path d="M330,640 Q520,600 700,650 L700,800 Q480,820 300,800 Z" fill="#7fa7d9" stroke="${ink}" stroke-width="5" stroke-linejoin="round"/><path d="M340,680 Q520,650 690,690" fill="none" stroke="#6a92c6" stroke-width="5"/>`;
   // screen shake on impacts (first ~6 frames)
   const shakeOn = ["shocked", "scared", "panic"].includes(b.pose) && lt < 0.22;
@@ -460,6 +482,10 @@ function frameSVG(t) {
   if (fade < 1) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${(1 - Math.max(0, fade)).toFixed(3)}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}" viewBox="0 0 ${OW} ${OH}"><defs>
     <filter id="dof" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${cam.blur}"/></filter>${trFilter}
+    <radialGradient id="softShadow"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="lit-night"><feColorMatrix type="matrix" values="0.78 0 0 0 0.02  0 0.82 0 0 0.03  0 0 0.95 0 0.08  0 0 0 1 0"/></filter>
+    <filter id="lit-sunset"><feColorMatrix type="matrix" values="1 0 0 0 0.04  0 0.9 0 0 0.02  0 0 0.8 0 0  0 0 0 1 0"/></filter>
+    <filter id="lit-party"><feColorMatrix type="matrix" values="0.88 0 0 0 0.06  0 0.8 0 0 0.01  0 0 0.95 0 0.1  0 0 0 1 0"/></filter>
     <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient>
     </defs>${s}</svg>`;
 }
@@ -467,6 +493,7 @@ function frameSVG(t) {
 // ---------- 4. render + encode ----------
 const hand = readFileSync(join(here, "../../../ink-theater/assets/patrickhand.ttf")).toString("base64");
 const black = readFileSync(join(here, "montserrat-900.woff2")).toString("base64");
+const bubbleFont = readFileSync(join(here, "nunito-800.woff2")).toString("base64");
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const browser = await chromium.launch();
@@ -474,8 +501,9 @@ const page = await browser.newPage({ viewport: { width: OW, height: OH } });
 await page.setContent(`<html><head><style>
   @font-face{font-family:InkHand;src:url(data:font/ttf;base64,${hand}) format("truetype");}
   @font-face{font-family:MBlack;font-weight:900;src:url(data:font/woff2;base64,${black}) format("woff2");}
+  @font-face{font-family:Bubble;font-weight:800;src:url(data:font/woff2;base64,${bubbleFont}) format("woff2");}
   body{margin:0;overflow:hidden} text{font-family:InkHand,sans-serif}</style></head><body><div id="s"></div></body></html>`);
-await page.evaluate(() => Promise.all([document.fonts.load("40px InkHand"), document.fonts.load("900 40px MBlack")]));
+await page.evaluate(() => Promise.all([document.fonts.load("40px InkHand"), document.fonts.load("900 40px MBlack"), document.fonts.load("800 40px Bubble")]));
 
 const tag = VERTICAL ? "9x16" : "16x9";
 if (args.includes("--stills")) {
