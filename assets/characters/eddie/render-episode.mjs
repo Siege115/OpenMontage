@@ -485,7 +485,7 @@ function frameSVG(t) {
     <radialGradient id="softShadow"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
     <filter id="lit-night"><feColorMatrix type="matrix" values="0.78 0 0 0 0.02  0 0.82 0 0 0.03  0 0 0.95 0 0.08  0 0 0 1 0"/></filter>
     <filter id="lit-sunset"><feColorMatrix type="matrix" values="1 0 0 0 0.04  0 0.9 0 0 0.02  0 0 0.8 0 0  0 0 0 1 0"/></filter>
-    <filter id="lit-party"><feColorMatrix type="matrix" values="0.88 0 0 0 0.06  0 0.8 0 0 0.01  0 0 0.95 0 0.1  0 0 0 1 0"/></filter>
+    <filter id="lit-party"><feColorMatrix type="matrix" values="0.95 0 0 0 0.015  0 0.9 0 0 0  0 0 0.98 0 0.03  0 0 0 1 0"/></filter>
     <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient>
     </defs>${s}</svg>`;
 }
