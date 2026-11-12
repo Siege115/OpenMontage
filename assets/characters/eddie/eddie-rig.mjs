@@ -226,6 +226,11 @@ export const PROPS = {
       <path d="M${tail * w * 0.18 + 4 * tail},${h / 2 - 3} L${tail * w * 0.04},${h / 2 - 3}" stroke="${P.paper}" stroke-width="8"/>` +
       lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 46 + 14}" text-anchor="middle" font-size="40" fill="${P.ink}" font-family="InkHand, 'Comic Sans MS', sans-serif">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
   },
+  chair: (o) => `<g transform="translate(${o[0]},${o[1]})">
+    <rect x="-80" y="-250" width="160" height="150" rx="22" fill="#5b6475" stroke="${P.ink}" stroke-width="5"/>
+    <rect x="-95" y="-110" width="190" height="32" rx="12" fill="#6f7a8d" stroke="${P.ink}" stroke-width="5"/>
+    <path d="M0,-78 L0,-30 M-70,-10 L70,-10 M0,-30 L-60,-10 M0,-30 L60,-10" fill="none" stroke="${P.ink}" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="-70" cy="-6" r="8" fill="${P.ink}"/><circle cx="70" cy="-6" r="8" fill="${P.ink}"/></g>`,
   // ---- scene props (o = position relative to the pelvis) ----
   zzz: (o) => `<g font-family="InkHand, 'Comic Sans MS', sans-serif" fill="${P.ink}">
     <text x="${o[0]}" y="${o[1]}" font-size="30">z</text><text x="${o[0] + 18}" y="${o[1] - 22}" font-size="40">z</text>

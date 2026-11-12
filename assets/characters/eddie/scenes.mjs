@@ -212,7 +212,11 @@ export const SCENES = {
   // ---------------------------------------------------------------- soft studio (for big-number cards)
   studio({ tone = "#fbefc4" } = {}, t = 0) {
     let bg = `<rect width="${W}" height="1080" fill="${tone}"/>`;
-    for (let y = 60; y < 1080; y += 80) for (let x = 60 + ((y / 80) % 2) * 40; x < W; x += 80) bg += `<circle cx="${x}" cy="${y}" r="4" fill="${INK}" opacity="0.07"/>`;
+    const dx = (t * 14) % 80, dy = (t * 6) % 80;
+    for (let y = -20; y < 1100; y += 80) for (let x = -40 + ((Math.round((y + 20) / 80)) % 2) * 40; x < W + 80; x += 80) bg += `<circle cx="${x + dx}" cy="${y + dy}" r="4" fill="${INK}" opacity="0.07"/>`;
+    // drifting doodles
+    for (let i = 0; i < 6; i++) { const x = ((i * 337 + t * (18 + i * 3)) % 2100) - 90, y = 120 + ((i * 173) % 700) + Math.sin(t + i) * 20;
+      bg += `<g transform="translate(${x},${y}) rotate(${t * 20 + i * 50})" opacity=".12" fill="none" stroke="${INK}" stroke-width="5">${["<circle r='26'/>", "<path d='M-24,0 L24,0 M0,-24 L0,24'/>", "<path d='M-22,18 L0,-22 L22,18 Z'/>"][i % 3]}</g>`; }
     bg += `<ellipse cx="960" cy="${FLOOR + 10}" rx="700" ry="40" fill="${INK}" opacity="0.06"/>`;
     return { bg, fg: "" };
   },
