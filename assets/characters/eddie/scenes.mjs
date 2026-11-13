@@ -2,6 +2,7 @@
 // Eddie himself stays black & white; scenes use muted pastel color so he pops.
 // Each scene returns { bg, fg }: fg is drawn in front of Eddie (desks, blankets...).
 
+import { wainscot, wallpaper, stringLights, pendant, frameArt, wallShelf, knick, booksRow, rug, bigPlant, floorLamp, outlet, corkboard, motes, sleepyCat, window4, shade } from "./decor.mjs";
 const INK = "#1b1b20";
 const W = 1920, FLOOR = 870;
 const o = (w = 5) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
@@ -61,22 +62,34 @@ const books = (x, y, n, seed = 1) => {
 export const SCENES = {
   // ---------------------------------------------------------------- bedroom
   bedroom({ night = false, clock = "3:00", dim = false } = {}, t = 0) {
-    let bg = `<rect width="${W}" height="${FLOOR}" fill="#dfe8f3"/>`;
-    for (let x = 60; x < W; x += 120) bg += `<path d="M${x},0 L${x},${FLOOR}" stroke="#d2ddeb" stroke-width="10"/>`;
-    bg += windowFrame(1270, 170, 380, 300, night, t);
+    let bg = `<rect width="${W}" height="${FLOOR}" fill="#dfe8f3"/>` + wallpaper("#dfe8f3", FLOOR, W, true);
+    bg += window4(1270, 170, 380, 300, night ? "#3b4a78" : "#bfe0f5", "#e9a8a0", night ? `<circle cx="1540" cy="250" r="34" fill="#f6f1d8" ${o(3)}/>` + [...Array(6)].map((_, i) => `<circle cx="${1300 + i * 55}" cy="${200 + (i * 37) % 120}" r="3" fill="#fff"/>`).join("") : `<ellipse cx="1380" cy="230" rx="60" ry="20" fill="#fff"/><path d="M1270,470 L1360,400 L1440,440 L1540,380 L1650,470 Z" fill="#a9d79c"/>`);
     bg += frame(330, 160, 200, 150, "#f7d774", `<path d="M360,280 L410,220 L450,260 L480,230 L510,280 Z" fill="#8fc49a" ${o(3)}/><circle cx="480" cy="200" r="16" fill="#f0b27a" ${o(3)}/>`);
+    // posters + star stickers, wall shelf, fairy lights over the bed
+    bg += `<g transform="rotate(-3,640,260)"><rect x="580" y="190" width="130" height="180" fill="#5b8fd9" ${o(4)}/><circle cx="645" cy="250" r="34" fill="#f7d774" ${o(3)}/><path d="M600,340 l90,0 M612,320 l66,0" stroke="#fff" stroke-width="7"/></g>`;
+    for (const [x, y] of [[760, 180], [820, 240], [740, 300]]) bg += `<path d="M${x},${y - 14} l4,10 l11,1 l-8,7 l3,11 l-10,-6 l-10,6 l3,-11 l-8,-7 l11,-1 z" fill="#f7e27a" ${o(2)}/>`;
+    bg += wallShelf(900, 330, 300, [["books", 16, 6, 7], ["trophy", 170], ["plant", 240]], t);
+    bg += stringLights(110, 720, 560, 30, t);
     bg += floorBoards();
     bg += `<ellipse cx="960" cy="985" rx="520" ry="70" fill="#c9b6e4" ${o(4)}/><ellipse cx="960" cy="985" rx="440" ry="50" fill="none" stroke="#b49ad8" stroke-width="5"/>`;
-    // bed (left)
+    // bed (left) with patterned quilt
     bg += `<rect x="90" y="560" width="40" height="320" rx="10" fill="#b98a63" ${o(5)}/>
       <rect x="130" y="700" width="560" height="110" rx="14" fill="#fff" ${o(5)}/>
       <path d="M260,690 Q470,665 690,690 L690,790 Q470,810 260,800 Z" fill="#7fa7d9" ${o(5)}/>
+      ${[300, 380, 460, 540, 620].map((x) => `<path d="M${x},${700 - (x - 260) * 0.02} l20,0 l0,20 l-20,0 z" fill="#f7d774" opacity=".8"/><path d="M${x + 40},${740} l20,0 l0,20 l-20,0 z" fill="#f4efe4" opacity=".8"/>`).join("")}
       <path d="M300,720 Q470,705 670,722" fill="none" stroke="#6a92c6" stroke-width="5"/>
-      <rect x="150" y="650" width="130" height="60" rx="24" fill="#fff" ${o(5)}/>
+      <rect x="150" y="650" width="130" height="60" rx="24" fill="#fff" ${o(5)}/><rect x="168" y="660" width="40" height="40" rx="12" fill="#f29ac0" opacity=".6"/>
       <rect x="690" y="640" width="34" height="240" rx="10" fill="#b98a63" ${o(5)}/>`;
-    // nightstand + lamp + digital clock
+    // slippers + backpack
+    bg += `<ellipse cx="560" cy="890" rx="34" ry="12" fill="#e9a8a0" ${o(3)}/><ellipse cx="620" cy="896" rx="34" ry="12" fill="#e9a8a0" ${o(3)}/>`;
+    bg += `<path d="M1120,870 L1110,760 Q1150,720 1190,760 L1180,870 Z" fill="#8fc49a" ${o(4)}/><rect x="1125" y="800" width="50" height="34" rx="6" fill="#6fae7d" ${o(3)}/><path d="M1130,760 Q1150,735 1170,760" fill="none" ${o(3)}/>`;
+    // nightstand + lamp + book + glass
     bg += `<rect x="760" y="720" width="150" height="150" rx="8" fill="#c99b72" ${o(5)}/><path d="M760,795 L910,795" ${o(4)}/><circle cx="835" cy="760" r="6" fill="${INK}"/><circle cx="835" cy="835" r="6" fill="${INK}"/>
-      <path d="M800,720 L870,720 L860,700 L810,700 Z" fill="#9b8aa8" ${o(4)}/><path d="M835,700 L835,640" ${o(5)}/><path d="M790,640 L880,640 L860,580 L810,580 Z" fill="#f7e2a8" ${o(5)}/>`;
+      <path d="M800,720 L870,720 L860,700 L810,700 Z" fill="#9b8aa8" ${o(4)}/><path d="M835,700 L835,640" ${o(5)}/><path d="M790,640 L880,640 L860,580 L810,580 Z" fill="#f7e2a8" ${o(5)}/>
+      <rect x="870" y="704" width="34" height="16" fill="#e9767a" ${o(2.5)}/><rect x="770" y="690" width="22" height="30" rx="3" fill="#cfe9f7" ${o(2.5)}/>`;
+    // dresser by the window with a mirror
+    bg += `<rect x="1430" y="640" width="250" height="230" rx="8" fill="#c99b72" ${o(5)}/>${[690, 760, 830].map((y) => `<path d="M1430,${y - 20} L1680,${y - 20}" ${o(3)}/><rect x="1530" y="${y - 2}" width="50" height="8" rx="4" fill="${INK}"/>`).join("")}` + knick("plant", 1470, 640, t) + knick("frame", 1640, 640, t);
+    bg += outlet(1000, 800);
     if (clock) bg += `<rect x="1720" y="640" width="150" height="80" rx="14" fill="#2b2f3a" ${o(5)}/><text x="1795" y="697" text-anchor="middle" font-size="48" fill="#ff7b6b">${clock}</text><rect x="1700" y="720" width="190" height="150" fill="#c99b72" ${o(5)}/>`;
     if (night) bg += nightTint(dim ? 0.55 : 0.36) + glow(835, 610, 260, "#ffd98a", dim ? 0.35 : 0.6);
     return { bg, fg: "" };
@@ -100,25 +113,40 @@ export const SCENES = {
       <rect x="640" y="650" width="70" height="40" rx="6" fill="#f0b27a" ${o(4)}/><path d="M710,660 Q730,670 710,680" fill="none" ${o(4)}/>
       <path d="M760,688 L960,688" stroke="#8b8f99" stroke-width="10" stroke-linecap="round"/>`;
     if (night) { bg += nightTint(0.3); fg += glow(1190, 625, 220, "#9cd0ff", 0.5); }
+    // more life: wallpaper motif, corkboard, string lights, poster, floor plant, wastebasket
+    bg = bg.replace(`fill="#e3efe1"/>`, `fill="#e3efe1"/>` + wallpaper("#e3efe1", FLOOR, W, true));
+    bg += corkboard(560, 300, 180, 140, t) + stringLights(140, 520, 110, 16, t) + frameArt(980, 140, 120, 150, 1) + wallShelf(980, 340, 220, [["trophy", 30], ["globe", 100], ["clock", 175]], t);
+    bg += `<path d="M380,870 L370,780 L450,780 L440,870 Z" fill="#9aa3ae" ${o(4)}/><circle cx="395" cy="770" r="14" fill="#fff" ${o(2.5)}/>` + outlet(1450, 800);
+    if (!night) bg += motes(160, 900, 170, 820, t, 12);
     return { bg, fg };
   },
 
   // ---------------------------------------------------------------- living room
   living({ night = false } = {}, t = 0) {
-    let bg = `<rect width="${W}" height="${FLOOR}" fill="#f6e3d3"/>`;
-    bg += `<path d="M0,560 L${W},560" stroke="#e8cdb6" stroke-width="8"/>`;
-    bg += frame(240, 170, 260, 190, "#c7a8e0", `<circle cx="370" cy="265" r="50" fill="#f7d774" ${o(3)}/>`) + frame(1420, 190, 200, 160, "#9cc3e6");
-    bg += floorBoards("#c7a382", "#b08c6b");
-    // couch
+    let bg = `<rect width="${W}" height="${FLOOR}" fill="#f6e3d3"/>` + wallpaper("#f6e3d3", 560, W, true) + wainscot("#f6e3d3", 560, FLOOR - 22);
+    bg += frame(240, 170, 260, 190, "#c7a8e0", `<circle cx="370" cy="265" r="50" fill="#f7d774" ${o(3)}/>`) + frame(1420, 190, 200, 160, "#9cc3e6", `<path d="M1440,330 Q1520,250 1600,330" fill="#8fc49a" ${o(3)}/>`);
+    // window with curtains (night city / day sky) and a wall clock
+    bg += window4(720, 150, 360, 250, night ? "#33406b" : "#bfe0f5", "#d98c7f", night
+      ? [...Array(7)].map((_, i) => `<rect x="${735 + i * 50}" y="${300 - (i * 37) % 90}" width="40" height="${100 + (i * 37) % 90}" fill="#26304f"/><rect x="${745 + i * 50}" y="${320 - (i * 37) % 90}" width="8" height="10" fill="#ffe39a"/>`).join("") + `<circle cx="1020" cy="200" r="22" fill="#f6f1d8"/>`
+      : `<ellipse cx="830" cy="220" rx="50" ry="16" fill="#fff"/>`);
+    bg += `<circle cx="1210" cy="230" r="46" fill="#fff" ${o(4)}/><path d="M1210,230 L1210,200 M1210,230 L1232,240" ${o(4)}/><path d="M1210,230 L${1210 + Math.sin(t) * 36},${230 - Math.cos(t) * 36}" stroke="#e5584f" stroke-width="2"/>`;
+    bg += wallShelf(120, 420, 380, [["plant", 40], ["books", 80, 7, 3], ["candle", 260], ["frame", 330]], t);
+    bg += stringLights(560, 1240, 120, 20, t);
+    bg += floorBoards("#c7a382", "#b08c6b") + rug(1010, 960, 520, 70, "#b5654f", "#f2d3a6");
+    // couch with cushions, throw blanket and a sleeping cat
     bg += `<rect x="120" y="640" width="560" height="160" rx="30" fill="#8fb3a0" ${o(5)}/>
       <rect x="90" y="700" width="90" height="150" rx="26" fill="#8fb3a0" ${o(5)}/><rect x="620" y="700" width="90" height="150" rx="26" fill="#8fb3a0" ${o(5)}/>
-      <rect x="170" y="730" width="480" height="80" rx="16" fill="#a5c5b3" ${o(5)}/><rect x="200" y="660" width="90" height="70" rx="18" fill="#f7d774" ${o(4)}/>`;
-    // floor lamp + bookshelf
-    bg += `<path d="M1300,870 L1300,520" ${o(6)}/><path d="M1250,520 L1350,520 L1325,450 L1275,450 Z" fill="#f7e2a8" ${o(5)}/><ellipse cx="1300" cy="872" rx="50" ry="12" fill="${INK}"/>`;
+      <rect x="170" y="730" width="480" height="80" rx="16" fill="#a5c5b3" ${o(5)}/><rect x="200" y="660" width="90" height="70" rx="18" fill="#f7d774" ${o(4)}/><rect x="300" y="668" width="80" height="64" rx="18" fill="#e9a8a0" ${o(4)}/>
+      <path d="M520,650 Q600,640 640,700 L640,800 Q600,790 560,800 Z" fill="#c7a8e0" ${o(4)}/><path d="M540,680 l80,0 M545,720 l85,0 M550,760 l80,0" stroke="#b08fd0" stroke-width="5"/>
+      <path d="M150,850 l0,20 M650,850 l0,20" ${o(6)}/>` + sleepyCat(460, 732, t);
+    // side table with a lamp + mug
+    bg += `<rect x="20" y="760" width="70" height="110" fill="#b98a63" ${o(4)}/>`;
+    // floor lamp + bookshelf with plants
+    bg += floorLamp(1300, FLOOR, t, false);
     bg += `<rect x="1460" y="420" width="320" height="450" fill="#c99b72" ${o(5)}/>`;
-    for (const y of [520, 640, 760]) bg += `<path d="M1460,${y} L1780,${y}" ${o(4)}/>` + books(1475, y, 9, y);
-    bg += books(1475, 860, 9, 3);
-    if (night) bg += nightTint(0.34) + glow(1300, 480, 300, "#ffd98a", 0.55);
+    for (const y of [520, 640, 760]) bg += `<path d="M1460,${y} L1780,${y}" ${o(4)}/>` + books(1475, y, 7, y) + knick(y === 640 ? "globe" : y === 520 ? "plant" : "vinyl", 1730, y, t);
+    bg += books(1475, 860, 9, 3) + bigPlant(1860, FLOOR, 0.75, t) + outlet(1120, 800);
+    if (night) bg += nightTint(0.3) + glow(1300, 480, 300, "#ffd98a", 0.55) + glow(900, 135, 260, "#ffe39a", 0.3);
     return { bg, fg: "" };
   },
 
@@ -206,6 +234,10 @@ export const SCENES = {
     bg += clockFace(470, 230, 70, t) + frame(160, 360, 220, 160, "#9cc3e6", `<text x="270" y="460" text-anchor="middle" font-size="56" fill="${INK}">A+</text>`);
     bg += floorBoards("#d7c7a6", "#c3b28e");
     bg += plant(140, 870, 1);
+    // alphabet strip, posters, globe, bookshelf, string of flags
+    for (let i = 0; i < 12; i++) bg += `<rect x="${60 + i * 72}" y="40" width="62" height="62" rx="6" fill="${["#f7d774", "#9cc3e6", "#e9a8a0", "#8fc49a"][i % 4]}" ${o(3)}/><text x="${91 + i * 72}" y="86" text-anchor="middle" font-size="40" fill="${INK}" style="font-family:MBlack,sans-serif;font-weight:900">${"ABCDEFGHIJKL"[i]}</text>`;
+    bg += `<path d="M930,120 Q1370,170 1810,120" fill="none" stroke="${INK}" stroke-width="3"/>` + [...Array(12)].map((_, i) => { const x = 950 + i * 75, y = 122 + Math.sin((i / 11) * Math.PI) * 24; return `<path d="M${x},${y} l30,0 l-15,${30 + Math.sin(t * 2 + i) * 2} z" fill="${["#e5584f", "#f7d774", "#5b8fd9", "#8fc49a"][i % 4]}" ${o(2)}/>`; }).join("");
+    bg += frameArt(560, 360, 150, 190, 0) + `<rect x="430" y="620" width="300" height="250" fill="#c99b72" ${o(5)}/><path d="M430,700 L730,700 M430,780 L730,780" ${o(4)}/>` + booksRow(445, 700, 10, 2, 70) + booksRow(445, 780, 6, 8, 70) + knick("globe", 680, 780, t) + knick("plant", 690, 620, t) + knick("jar", 470, 620, t);
     return { bg, fg: "" };
   },
 
@@ -223,26 +255,45 @@ export const SCENES = {
     bg += `<g transform="translate(40,${FLOOR - 40}) scale(1.55)"><path d="M0,0 L0,-90 Q20,-110 90,-115 L150,-185 Q190,-205 300,-200 Q360,-195 400,-120 L480,-110 Q510,-100 510,-60 L510,0 Z" fill="#d9776c" ${o(6)}/>
       <path d="M165,-120 L200,-175 Q230,-185 290,-182 L330,-120 Z" fill="#9cc3e6" ${o(4)}/><circle cx="110" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="110" cy="0" r="18" fill="#9aa0ad"/><circle cx="410" cy="0" r="48" fill="#2b2f3a" ${o(6)}/><circle cx="410" cy="0" r="18" fill="#9aa0ad"/>
       <rect x="490" y="-95" width="26" height="22" rx="6" fill="#ffe39a" ${o(3)}/></g>` + glow(700, FLOOR - 120, 260, "#ffe39a", 0.45);
+    // distant town lights, power poles, trees, road reflectors and a fence along the verge
+    for (let i = 0; i < 22; i++) bg += `<circle cx="${40 + i * 90 + (i * 37) % 40}" cy="${FLOOR - 150 - (i * 53) % 50}" r="${2.5 + (i % 3)}" fill="#ffe39a" opacity="${0.5 + 0.4 * Math.sin(t * 2 + i)}"/>`;
+    for (const x of [300, 1000, 1500]) bg += `<path d="M${x},${FLOOR - 120} L${x},${FLOOR - 420} M${x - 40},${FLOOR - 400} L${x + 40},${FLOOR - 400}" stroke="#1b1f33" stroke-width="10"/>`;
+    bg += `<path d="M-20,${FLOOR - 390} Q150,${FLOOR - 330} 300,${FLOOR - 400} Q650,${FLOOR - 320} 1000,${FLOOR - 400} Q1250,${FLOOR - 340} 1500,${FLOOR - 400} Q1700,${FLOOR - 350} ${W},${FLOOR - 390}" fill="none" stroke="#1b1f33" stroke-width="3"/>`;
+    for (const [x, k] of [[150, 1], [1250, 0.8], [1850, 1.1]]) bg += `<g transform="translate(${x},${FLOOR - 120}) scale(${k})"><path d="M0,0 L0,-80" stroke="#1b1f33" stroke-width="16"/><path d="M-70,-60 L0,-260 L70,-60 Z" fill="#26304a"/><path d="M-55,-130 L0,-300 L55,-130 Z" fill="#2c3854"/></g>`;
+    for (let x = 0; x < W; x += 60) bg += `<path d="M${x},${FLOOR - 120} L${x},${FLOOR - 160}" stroke="#5a5e6e" stroke-width="5"/>`;
+    bg += `<path d="M0,${FLOOR - 145} L${W},${FLOOR - 145}" stroke="#5a5e6e" stroke-width="4"/>`;
+    for (let x = ((-t * 900) % 400 + 400) % 400 - 400; x < W; x += 400) bg += `<rect x="${x}" y="${FLOOR - 100}" width="22" height="10" rx="4" fill="#ff8a5b"/>`;
     return { bg, fg: "" };
   },
 
   // ---------------------------------------------------------------- cafe
   cafe({ busy = true } = {}, t = 0) {
     let bg = `<rect width="${W}" height="${FLOOR}" fill="#f3dcc2"/><rect y="560" width="${W}" height="${FLOOR - 560}" fill="#e6c7a6"/><path d="M0,560 L${W},560" stroke="#c9a582" stroke-width="8"/>`;
-    // menu board + window
+    // exposed brick patch + wall art
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) bg += `<rect x="${640 + c * 70 + (r % 2) * 35}" y="${80 + r * 34}" width="64" height="28" rx="3" fill="#d9967a" opacity="${0.55 + ((r * 3 + c) % 4) * 0.08}" stroke="#b8735a" stroke-width="2"/>`;
+    bg += frameArt(700, 340, 140, 110, 0) + frameArt(880, 320, 120, 140, 2);
+    // menu board + window (with OPEN sign)
     bg += `<rect x="1230" y="120" width="520" height="300" rx="12" fill="#2f3a35" ${o(6)}/><g fill="#f4f4ee" font-size="40" font-family="InkHand, sans-serif">
-      <text x="1490" y="185" text-anchor="middle" font-size="56">MENU</text><text x="1280" y="250">coffee .......... 3</text><text x="1280" y="305">tea ............... 2</text><text x="1280" y="360">cake .............. 4</text></g>`;
+      <text x="1490" y="185" text-anchor="middle" font-size="56">MENU</text><text x="1280" y="250">coffee .......... 3</text><text x="1280" y="305">tea ............... 2</text><text x="1280" y="360">cake .............. 4</text></g>
+      <path d="M1690,380 q10,-30 30,-10 q-6,24 -30,10" fill="#f7d774" opacity=".8"/>`;
     bg += windowFrame(160, 150, 420, 280, false, t);
-    // pendant lamps
+    bg += `<rect x="420" y="330" width="120" height="50" rx="10" fill="#2b2f3a" ${o(3)}/><text x="480" y="367" text-anchor="middle" font-size="30" fill="${Math.floor(t * 1.2) % 4 ? "#ff6b8b" : "#7a3b4b"}" style="font-family:MBlack,sans-serif;font-weight:900">OPEN</text>`;
+    // pendant lamps + hanging plant
     for (const x of [760, 1060]) bg += `<path d="M${x},0 L${x},170" ${o(4)}/><path d="M${x - 50},230 L${x + 50},230 L${x + 30},170 L${x - 30},170 Z" fill="#8fb3a0" ${o(5)}/>` + glow(x, 260, 180, "#ffd98a", 0.45);
+    bg += `<path d="M1150,0 L1150,90" ${o(3)}/><path d="M1120,90 L1180,90 L1170,130 L1130,130 Z" fill="#d98c5f" ${o(3)}/>` + [...Array(5)].map((_, i) => `<path d="M${1130 + i * 10},128 q${(i - 2) * 8},${60 + i * 10} ${(i - 2) * 4},${110 + (i % 2) * 30}" fill="none" stroke="#5fa86a" stroke-width="6" stroke-linecap="round"/>`).join("");
     bg += floorBoards("#b98a63", "#a5764f");
-    // counter with espresso machine (right)
-    bg += `<rect x="1300" y="620" width="560" height="250" fill="#8a5a3c" ${o(6)}/><rect x="1280" y="600" width="600" height="30" rx="6" fill="#c99b72" ${o(5)}/>
+    // back shelf with cups and coffee bags behind the counter
+    bg += wallShelf(1300, 470, 520, [["mug", 30], ["mug", 80], ["mug", 130], ["jar", 200], ["jar", 250], ["plant", 330], ["books", 380, 4, 2, 60]], t);
+    // counter with espresso machine, pastry case and register (right)
+    bg += `<rect x="1300" y="620" width="560" height="250" fill="#8a5a3c" ${o(6)}/>${[1340, 1480, 1620, 1760].map((x) => `<rect x="${x}" y="650" width="100" height="190" rx="6" fill="none" stroke="#6f4630" stroke-width="5"/>`).join("")}<rect x="1280" y="600" width="600" height="30" rx="6" fill="#c99b72" ${o(5)}/>
       <rect x="1520" y="470" width="190" height="130" rx="14" fill="#b9bcc6" ${o(5)}/><rect x="1555" y="500" width="120" height="40" rx="6" fill="#2b2f3a" ${o(3)}/><path d="M1580,600 L1580,560 M1650,600 L1650,560" ${o(5)}/>
-      <rect x="1360" y="555" width="60" height="45" rx="6" fill="#fff" ${o(4)}/>`;
-    // table + cups (left)
+      <rect x="1360" y="555" width="60" height="45" rx="6" fill="#fff" ${o(4)}/>
+      <path d="M1730,600 L1730,520 Q1730,500 1750,500 L1850,500 Q1870,500 1870,520 L1870,600 Z" fill="#dff1fa" opacity=".85" ${o(4)}/><circle cx="1770" cy="580" r="16" fill="#f0b27a" ${o(2.5)}/><circle cx="1810" cy="582" r="14" fill="#e9767a" ${o(2.5)}/><path d="M1830,592 l30,0 l-6,-18 l-18,0 z" fill="#f7d774" ${o(2.5)}/>`;
+    // table + chairs + cups (left)
+    bg += `<path d="M230,870 L240,700 M230,760 L320,760 L330,870" fill="none" ${o(6)}/><path d="M610,870 L600,700 M610,760 L520,760 L510,870" fill="none" ${o(6)}/>`;
     bg += `<ellipse cx="420" cy="720" rx="190" ry="34" fill="#c99b72" ${o(5)}/><path d="M420,750 L420,860 M360,870 L480,870" ${o(7)}/>
-      <rect x="370" y="676" width="44" height="40" rx="6" fill="#fff" ${o(4)}/><rect x="450" y="680" width="40" height="36" rx="6" fill="#f0b27a" ${o(4)}/>`;
+      <rect x="370" y="676" width="44" height="40" rx="6" fill="#fff" ${o(4)}/><rect x="450" y="680" width="40" height="36" rx="6" fill="#f0b27a" ${o(4)}/><path d="M300,712 l40,-6 l6,10 z" fill="#f7d774" ${o(2.5)}/>`;
+    bg += bigPlant(1000, FLOOR, 0.8, t, "#8fb3a0") + `<rect x="1150" y="770" width="60" height="100" rx="6" fill="#4a4f5c" ${o(4)}/><path d="M1160,790 l40,0" stroke="#e5584f" stroke-width="5"/>`;
     for (const [i, cx0] of [[0, 392], [1, 470], [2, 1390]].entries()) for (let k = 0; k < 2; k++) {
       const p = (t * 0.5 + k / 2 + i * 0.3) % 1, base = i === 2 ? 550 : 670;
       bg += `<path d="M${cx0 + Math.sin(t * 2 + k + i) * 6},${base - p * 70} q8,-12 0,-24 q-8,-12 0,-24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="${(1 - p) * 0.8}"/>`;
@@ -252,13 +303,28 @@ export const SCENES = {
 
   // ---------------------------------------------------------------- soft studio (for big-number cards)
   studio({ tone = "#fbefc4" } = {}, t = 0) {
-    let bg = `<rect width="${W}" height="1080" fill="${tone}"/>`;
-    const dx = (t * 14) % 80, dy = (t * 6) % 80;
-    for (let y = -20; y < 1100; y += 80) for (let x = -40 + ((Math.round((y + 20) / 80)) % 2) * 40; x < W + 80; x += 80) bg += `<circle cx="${x + dx}" cy="${y + dy}" r="4" fill="${INK}" opacity="0.07"/>`;
-    // drifting doodles
-    for (let i = 0; i < 6; i++) { const x = ((i * 337 + t * (18 + i * 3)) % 2100) - 90, y = 120 + ((i * 173) % 700) + Math.sin(t + i) * 20;
-      bg += `<g transform="translate(${x},${y}) rotate(${t * 20 + i * 50})" opacity=".12" fill="none" stroke="${INK}" stroke-width="5">${["<circle r='26'/>", "<path d='M-24,0 L24,0 M0,-24 L0,24'/>", "<path d='M-22,18 L0,-22 L22,18 Z'/>"][i % 3]}</g>`; }
-    bg += `<ellipse cx="960" cy="${FLOOR + 10}" rx="700" ry="40" fill="${INK}" opacity="0.06"/>`;
+    // a cozy "explainer" set: tinted walls, panelling, bookcase, gallery wall, desk corner, warm pendants
+    let bg = `<rect width="${W}" height="${FLOOR}" fill="${tone}"/>` + wallpaper(tone, 620, W, true) + wainscot(tone, 620, FLOOR - 22);
+    bg += floorBoards("#d6b993", "#c2a07a");
+    bg += rug(960, 975, 560, 66, shade(tone, -0.25), shade(tone, 0.4));
+    // window with a soft daytime view (right)
+    bg += window4(1480, 150, 320, 260, "#cfe8f7", shade(tone, -0.3), `<ellipse cx="1570" cy="210" rx="44" ry="16" fill="#fff"/><path d="M1480,410 L1540,330 L1600,370 L1680,300 L1800,410 Z" fill="#a9d79c"/>`);
+    // tall bookcase (left)
+    bg += `<rect x="30" y="250" width="280" height="${FLOOR - 250}" fill="#a5764f" ${o(5)}/><rect x="46" y="266" width="248" height="${FLOOR - 282}" fill="#8a5a3c"/>`;
+    for (const [k, y] of [380, 500, 620, 740, 850].entries()) bg += `<rect x="46" y="${y}" width="248" height="12" fill="#c99b72" ${o(2.5)}/>`;
+    bg += booksRow(56, 380, 7, 3, 96) + knick("globe", 250, 380, t) + knick("trophy", 90, 500, t) + booksRow(130, 500, 6, 9, 90) + booksRow(56, 620, 4, 5, 90) + knick("plant", 200, 620, t) + knick("jar", 262, 620, t) +
+      booksRow(56, 740, 9, 13, 92) + knick("vinyl", 100, 850, t) + knick("candle", 180, 850, t) + knick("clock", 250, 850, t);
+    // gallery wall + wall shelf
+    bg += frameArt(400, 150, 170, 130, 0) + frameArt(600, 120, 120, 160, 1) + frameArt(400, 310, 120, 100, 3) + frameArt(545, 310, 175, 100, 2);
+    bg += wallShelf(820, 300, 330, [["plant", 40], ["books", 90, 6, 4], ["frame", 260], ["mug", 305]], t);
+    bg += corkboard(1150, 470, 300, 190, t) + outlet(760, 800) + outlet(1260, 800);
+    bg += pendant(700, 60, shade(tone, -0.35), "#ffd98a", t) + pendant(1240, 40, shade(tone, -0.35), "#ffd98a", t);
+    // desk corner (right) with a laptop, mug and lamp; big plant
+    bg += `<rect x="1480" y="690" width="400" height="26" rx="6" fill="#c99b72" ${o(4)}/><path d="M1510,716 L1510,${FLOOR} M1850,716 L1850,${FLOOR}" ${o(7)}/><rect x="1690" y="716" width="150" height="110" fill="#b98a63" ${o(4)}/><circle cx="1765" cy="770" r="5" fill="${INK}"/>`;
+    bg += `<path d="M1530,690 L1610,690 L1620,620 L1540,620 Z" fill="#4a4f5c" ${o(4)}/><path d="M1515,690 L1640,690" ${o(5)}/><rect x="1552" y="632" width="56" height="44" fill="#9cd0ff" opacity=".7"/>` + knick("mug", 1680, 690, t) +
+      `<path d="M1800,690 L1800,610 L1760,570" fill="none" ${o(5)}/><path d="M1735,580 L1790,555 L1798,585 Z" fill="#e9767a" ${o(4)}/>`;
+    bg += bigPlant(1880, FLOOR, 0.9, t);
+    bg += motes(380, 1500, 150, 820, t, 16);
     return { bg, fg: "" };
   },
 };

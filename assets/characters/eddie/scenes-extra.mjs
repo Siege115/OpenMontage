@@ -1,6 +1,7 @@
 // More furnished scenes for Eddie episodes, each with constant ambient motion (all a pure
 // function of time t, so renders are deterministic). 1920x1080, floor at y=870.
 // Each returns { bg, fg }; fg is drawn in front of the characters.
+import { wainscot, wallpaper, stringLights, pendant, frameArt, wallShelf, knick, booksRow, rug, bigPlant, floorLamp, outlet, corkboard, motes, window4, confetti, shade } from "./decor.mjs";
 const INK = "#1b1b20";
 const W = 1920, FLOOR = 870;
 const o = (w = 5) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
@@ -56,6 +57,15 @@ export const EXTRA_SCENES = {
     // birds + falling leaves
     for (let i = 0; i < 3; i++) bg += bird(((t * (110 + i * 25) + i * 700) % 2300) - 150, 260 + i * 50 + S(t + i) * 15, t + i, 0.9 - i * 0.15);
     for (let i = 0; i < 6; i++) { const p = (t * 0.12 + i / 6) % 1; bg += `<ellipse cx="${200 + i * 300 + S(t * 1.5 + i) * 40}" cy="${300 + p * 600}" rx="9" ry="5" fill="#e0a03c" transform="rotate(${t * 90 + i * 60},${200 + i * 300},${300 + p * 600})" opacity="${1 - p * 0.5}"/>`; }
+    // extra life: kite, lamp post, bin, sign, bushes, picnic blanket, butterflies, fence far back
+    for (let x = 0; x < W; x += 46) bg += `<path d="M${x},648 L${x},612 M${x - 4},622 L${x + 50},622 M${x - 4},638 L${x + 50},638" stroke="#c9a77f" stroke-width="5"/>`;
+    const kx = 1000 + Math.sin(t * 0.6) * 60, ky = 200 + Math.cos(t * 0.9) * 30;
+    bg += `<path d="M${kx},${ky + 40} Q${kx - 120},${ky + 300} ${kx - 260},${FLOOR - 180}" fill="none" stroke="${INK}" stroke-width="2"/><path d="M${kx},${ky - 50} L${kx + 36},${ky} L${kx},${ky + 40} L${kx - 36},${ky} Z" fill="#e5584f" ${o(3)}/><path d="M${kx},${ky - 50} L${kx},${ky + 40} M${kx - 36},${ky} L${kx + 36},${ky}" stroke="#fff" stroke-width="3"/>` + [0, 1, 2].map((k) => `<path d="M${kx - 8 - k * 20},${ky + 52 + k * 26} l10,8 l-10,8 z" fill="${["#f7d774", "#5b8fd9", "#8fc49a"][k]}"/>`).join("");
+    bg += `<path d="M760,${FLOOR} L760,520" ${o(7)}/><path d="M735,520 L785,520 L775,470 L745,470 Z" fill="#f4efe4" ${o(4)}/><path d="M745,470 L760,450 L775,470" fill="#4a4f5c" ${o(3)}/>`;
+    bg += `<path d="M1560,${FLOOR} L1550,780 L1620,780 L1610,${FLOOR} Z" fill="#6f8f6a" ${o(4)}/><path d="M1546,780 L1624,780" ${o(6)}/><path d="M1580,${FLOOR} L1580,700 M1560,700 L1660,700 L1660,650 L1560,650 Z" fill="#9b6b48" ${o(4)}/><text x="1610" y="684" text-anchor="middle" font-size="24" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">POND</text>`;
+    for (const [bx, k] of [[640, 1], [1700, 0.9], [60, 0.8]]) bg += `<g transform="translate(${bx},${FLOOR}) scale(${k})"><path d="M-80,0 a40,40 0 0,1 40,-50 a45,45 0 0,1 80,-10 a40,40 0 0,1 40,60 z" fill="#5fa86a" ${o(4)}/><circle cx="-20" cy="-40" r="7" fill="#f29ac0"/><circle cx="30" cy="-48" r="7" fill="#fff"/></g>`;
+    bg += `<g transform="translate(1720,${FLOOR + 120}) rotate(-6)"><rect x="-120" y="-40" width="240" height="80" fill="#e5584f" ${o(4)}/>${[-80, -40, 0, 40, 80].map((x) => `<path d="M${x},-40 L${x},40" stroke="#fff" stroke-width="10" opacity=".7"/>`).join("")}<rect x="-30" y="-70" width="70" height="44" rx="6" fill="#c99b72" ${o(3)}/></g>`;
+    for (let i = 0; i < 3; i++) { const bx = 300 + i * 600 + Math.sin(t * 0.7 + i) * 80, by = 640 + Math.cos(t * 1.1 + i * 2) * 40, f = Math.abs(Math.sin(t * 12 + i)); bg += `<g transform="translate(${bx},${by})"><ellipse cx="-8" cy="0" rx="${10 * f + 2}" ry="8" fill="${["#f7d774", "#f29ac0", "#9cc3e6"][i]}" ${o(1.5)}/><ellipse cx="8" cy="0" rx="${10 * f + 2}" ry="8" fill="${["#f7d774", "#f29ac0", "#9cc3e6"][i]}" ${o(1.5)}/><path d="M0,-8 L0,8" ${o(2.5)}/></g>`; }
     return { bg, fg: "" };
   },
 
@@ -81,6 +91,12 @@ export const EXTRA_SCENES = {
     bg += `</g>`;
     const fg = `<g transform="translate(0,${sway})"><path d="M330,0 L330,${FLOOR}" stroke="#c9cdd4" stroke-width="18"/><path d="M330,0 L330,${FLOOR}" fill="none" ${o(4)}/>
       <path d="M1610,0 L1610,${FLOOR}" stroke="#c9cdd4" stroke-width="18"/></g>`;
+    // route map strip, ceiling light panels, door, stickers, emergency handle
+    bg += `<rect x="740" y="100" width="440" height="100" rx="10" fill="#fff" ${o(4)}/><path d="M770,150 L1150,150" stroke="#e5584f" stroke-width="8"/>` + [...Array(7)].map((_, i) => `<circle cx="${780 + i * 60}" cy="150" r="${i === 3 ? 12 : 8}" fill="${i === 3 ? "#f7d774" : "#fff"}" ${o(3)}/><text x="${780 + i * 60}" y="${i % 2 ? 185 : 128}" text-anchor="middle" font-size="16" fill="${INK}" style="font-family:MBlack,sans-serif;font-weight:900">${["A", "B", "C", "D", "E", "F", "G"][i]}</text>`).join("");
+    for (let x = 60; x < W; x += 360) bg += `<rect x="${x}" y="8" width="240" height="22" rx="8" fill="#fffbe6" opacity="${0.85 + 0.15 * Math.sin(t * 40 + x) * (Math.sin(t * 0.7 + x) > 0.97 ? 1 : 0)}" ${o(3)}/>`;
+    bg += `<rect x="900" y="470" width="120" height="90" rx="6" fill="#d5dbe3" ${o(3)}/><rect x="918" y="488" width="84" height="54" fill="#e5584f"/><text x="960" y="525" text-anchor="middle" font-size="18" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">STOP</text>`;
+    bg += `<rect x="1180" y="480" width="190" height="66" rx="8" fill="#22202b" ${o(3)}/><text x="1275" y="526" text-anchor="middle" font-size="30" fill="#ff9a3c" style="font-family:MBlack,sans-serif;font-weight:900">${["NEXT: D", "MIND THE GAP", "NEXT: D"][Math.floor(t / 2.5) % 3]}</text>`;
+    bg += `<circle cx="1560" cy="510" r="22" fill="#f7d774" ${o(3)}/><path d="M1552,510 l8,-10 l8,10" fill="none" ${o(3)}/><rect x="560" y="490" width="70" height="44" rx="6" fill="#8fc49a" ${o(2.5)}/><path d="M572,512 q10,-12 22,0 q10,12 24,0" fill="none" stroke="#fff" stroke-width="4"/>`;
     return { bg, fg };
   },
 
@@ -111,6 +127,14 @@ export const EXTRA_SCENES = {
       return s;
     };
     bg += cub(1220) + plant(1720, FLOOR, 1.1, t);
+    // ceiling grid, poster, filing cabinet + printer, coat rack, sticky notes, desk lamp glow
+    for (let x = 0; x < W; x += 160) bg += `<path d="M${x},0 L${x},60" stroke="#d3d9de" stroke-width="3"/>`;
+    bg += `<path d="M0,60 L${W},60" stroke="#d3d9de" stroke-width="4"/>`;
+    bg += `<rect x="790" y="290" width="200" height="250" fill="#2f5fb3" ${o(4)}/><path d="M820,470 L860,410 L900,440 L960,360" fill="none" stroke="#f7d774" stroke-width="8"/><text x="890" y="335" text-anchor="middle" font-size="30" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">GOALS</text>`;
+    for (const [x, y, c, r] of [[660, 160, "#f7d774", -6], [690, 260, "#f29ac0", 4], [150, 430, "#9cc3e6", -3]]) bg += `<rect x="${x}" y="${y}" width="70" height="66" fill="${c}" ${o(2.5)} transform="rotate(${r},${x + 35},${y + 33})"/>`;
+    bg += `<rect x="40" y="580" width="180" height="${FLOOR - 580}" fill="#9aa3ae" ${o(5)}/>${[660, 760].map((y) => `<path d="M40,${y} L220,${y}" ${o(4)}/><rect x="100" y="${y - 50}" width="60" height="12" rx="5" fill="${INK}"/>`).join("")}<rect x="60" y="520" width="140" height="60" rx="8" fill="#e3e8ee" ${o(4)}/><rect x="80" y="506" width="100" height="16" fill="#fff" ${o(2.5)}/><circle cx="180" cy="550" r="6" fill="#8fe39a"/>`;
+    bg += `<path d="M1900,${FLOOR} L1900,520 M1870,${FLOOR} L1930,${FLOOR}" ${o(6)}/><path d="M1900,560 q-40,10 -50,70 l30,0 q4,-50 20,-70" fill="#c9a77f" ${o(3)}/>`;
+    bg += knick("mug", 1300, 592, t) + knick("plant", 1380, 592, t) + outlet(600, 810) + wallShelf(1080, 540, 300, [["books", 20, 7, 4], ["trophy", 200], ["clock", 260]], t);
     return { bg, fg: "" };
   },
 
@@ -135,6 +159,12 @@ export const EXTRA_SCENES = {
     bg += `<rect y="${FLOOR}" width="${W}" height="${1080 - FLOOR}" fill="#b98a63"/><path d="M0,${FLOOR} L${W},${FLOOR}" ${o(5)}/>`;
     // dust motes
     for (let i = 0; i < 22; i++) { const x = 600 + r1(i) * 800 + S(t * 0.4 + i) * 30, y = 260 + ((r1(i + 5) * 600 - t * 12) % 600 + 600) % 600; bg += `<circle cx="${x}" cy="${y}" r="${1.5 + r1(i + 2) * 2.5}" fill="#fff" opacity="${0.4 + 0.4 * S(t * 2 + i)}"/>`; }
+    // hanging lamps, portrait, globe on a stand, book cart, rug
+    bg += pendant(700, 40, "#4f8a43", "#ffe39a", t) + pendant(1220, 40, "#4f8a43", "#ffe39a", t);
+    bg += frameArt(820, 660, 120, 150, 3, "#c99b72") + frameArt(980, 660, 120, 150, 3, "#c99b72");
+    bg += `<g transform="translate(1180,${FLOOR})"><path d="M0,0 L0,-120 M-30,0 L30,0" ${o(6)}/><circle cx="0" cy="-170" r="50" fill="#7fb8e0" ${o(4)}/><path d="M-30,-190 q20,10 10,30 q-14,10 -6,24 M10,-205 q24,14 14,36" fill="none" stroke="#6fb36a" stroke-width="10" stroke-linecap="round"/><path d="M-58,-170 A58,58 0 0 1 58,-170" fill="none" ${o(4)}/></g>`;
+    bg += `<g transform="translate(640,${FLOOR})"><rect x="-80" y="-120" width="160" height="90" fill="#a5764f" ${o(4)}/>${booksRow(-74, -120, 6, 21, 60)}<circle cx="-56" cy="-14" r="14" fill="${INK}"/><circle cx="56" cy="-14" r="14" fill="${INK}"/></g>`;
+    bg += `<ellipse cx="960" cy="${FLOOR + 110}" rx="560" ry="60" fill="#8a3f4a" ${o(4)}/><ellipse cx="960" cy="${FLOOR + 110}" rx="460" ry="42" fill="none" stroke="#e8c48a" stroke-width="6" stroke-dasharray="20 10"/>`;
     // reading table with banker's lamp (foreground)
     const fg = `<rect x="1240" y="760" width="600" height="34" rx="6" fill="#8a5a3c" ${o(5)}/><path d="M1290,794 L1290,1000 M1790,794 L1790,1000" ${o(8)}/>
       <path d="M1700,760 L1700,700" ${o(5)}/><path d="M1640,700 L1760,700 L1740,660 L1660,660 Z" fill="#4f8a43" ${o(5)}/>${glow("lamp", 1700, 720, 160, "#ffe39a", 0.55)}
@@ -162,6 +192,14 @@ export const EXTRA_SCENES = {
     const pulse = 1 + Math.max(0, S(t * 2 * Math.PI * 2)) * 0.08;
     bg += `<g transform="translate(1640,${FLOOR})"><rect x="-90" y="-330" width="180" height="330" rx="12" fill="#22202b" ${o(5)}/><circle cy="-230" r="${46 * pulse}" fill="#3d3a4a" ${o(5)}/><circle cy="-90" r="${62 * pulse}" fill="#3d3a4a" ${o(5)}/><circle cy="-90" r="18" fill="#111"/></g>`;
     bg += `<rect x="140" y="700" width="420" height="30" rx="6" fill="#c99b72" ${o(4)}/><path d="M170,730 L170,${FLOOR} M530,730 L530,${FLOOR}" ${o(6)}/><ellipse cx="260" cy="690" rx="60" ry="16" fill="#f0b27a" ${o(3)}/><rect x="400" y="640" width="40" height="60" rx="6" fill="#e9767a" ${o(3)}/><rect x="460" y="650" width="34" height="50" rx="6" fill="#8fc49a" ${o(3)}/>`;
+    // window with night city, banner, wall frames, couch, plant, cups, falling confetti
+    bg += window4(1180, 150, 300, 230, "#2a2f55", "#5a3f8a", [...Array(6)].map((_, i) => `<rect x="${1190 + i * 48}" y="${280 - (i * 41) % 80}" width="40" height="${110 + (i * 41) % 80}" fill="#1c2040"/><rect x="${1200 + i * 48}" y="${300 - (i * 41) % 80}" width="8" height="10" fill="#ffe39a"/>`).join(""));
+    bg += `<path d="M380,110 Q620,170 860,110" fill="none" stroke="#111" stroke-width="3"/>` + [..."PARTY!"].map((ch, i) => { const x = 420 + i * 78, y = 128 + Math.sin(((i + 0.5) / 6) * Math.PI) * 24; return `<path d="M${x - 30},${y} L${x + 30},${y} L${x},${y + 70} Z" fill="${["#ff6b6b", "#ffe36b", "#6bd4ff", "#8bff8b", "#ff9de2", "#ffb84d"][i]}" ${o(3)}/><text x="${x}" y="${y + 36}" text-anchor="middle" font-size="30" fill="${INK}" style="font-family:MBlack,sans-serif;font-weight:900">${ch}</text>`; }).join("");
+    bg += frameArt(1560, 200, 120, 150, 1) + frameArt(1700, 230, 140, 110, 2);
+    bg += `<rect x="1180" y="650" width="380" height="140" rx="28" fill="#c06a8a" ${o(5)}/><rect x="1150" y="700" width="80" height="140" rx="24" fill="#c06a8a" ${o(5)}/><rect x="1510" y="700" width="80" height="140" rx="24" fill="#c06a8a" ${o(5)}/><rect x="1220" y="720" width="300" height="70" rx="14" fill="#d58aa5" ${o(4)}/>`;
+    bg += bigPlant(1880, FLOOR, 0.8, t, "#8a6abf") + `<g>${[[240, 868], [700, 880], [1040, 876]].map(([x, y]) => `<path d="M${x - 14},${y - 30} L${x + 14},${y - 30} L${x + 10},${y} L${x - 10},${y} Z" fill="#e5584f" ${o(3)}/>`).join("")}</g>`;
+    bg += `<path d="M200,676 l120,0 l-10,10 l-100,0 z" fill="#f4efe4" ${o(3)}/><path d="M215,676 l45,-30 l45,30" fill="#f7c948" ${o(3)}/>`;
+    bg += confetti(t, 26);
     return { bg, fg: "" };
   },
 
@@ -181,6 +219,13 @@ export const EXTRA_SCENES = {
     bg += `<path d="M1620,720 L1620,330" ${o(6)}/><circle cx="1620" cy="322" r="11" fill="${Math.floor(t * 1.5) % 2 ? "#ff3b30" : "#5a1a1a"}" ${o(3)}/>`;
     bg += `<rect y="720" width="${W}" height="${FLOOR - 720}" fill="#8a7f95"/><rect y="${FLOOR}" width="${W}" height="${1080 - FLOOR}" fill="#9a8fa5"/><path d="M0,${FLOOR} L${W},${FLOOR}" ${o(5)}/>`;
     const fg = `<path d="M0,800 L${W},800" ${o(7)}/>${[...Array(25)].map((_, i) => `<path d="M${i * 80},800 L${i * 80},${FLOOR}" ${o(5)}/>`).join("")}`;
+    // sunset clouds, AC units, vents, a door hut with a lamp, deck chairs, plants and string lights
+    for (const [x, y, k] of [[300, 160, 1], [900, 120, 0.8], [1600, 210, 0.7]]) bg += `<g transform="translate(${x + Math.sin(t * 0.2 + x) * 20},${y}) scale(${k})"><ellipse rx="140" ry="26" fill="#ffc4a8" opacity=".85"/><ellipse cx="-40" cy="-16" rx="70" ry="28" fill="#ffd2b8" opacity=".85"/></g>`;
+    bg += `<g transform="translate(1720,720)"><rect x="-120" y="-200" width="240" height="200" fill="#7d7290" ${o(5)}/><path d="M-140,-200 L140,-200" ${o(7)}/><rect x="-50" y="-150" width="100" height="150" fill="#5a4f6a" ${o(4)}/><circle cx="35" cy="-70" r="6" fill="#ffd77a"/><rect x="-20" y="-190" width="40" height="22" rx="4" fill="#ffe39a" ${o(3)}/></g>${glow("door", 1720, 540, 140, "#ffe39a", 0.5)}`;
+    bg += `<g transform="translate(700,720)"><rect x="-90" y="-110" width="180" height="110" rx="8" fill="#b9bcc6" ${o(5)}/><circle cx="-30" cy="-55" r="38" fill="#9aa0ad" ${o(4)}/><g transform="rotate(${t * 400},-30,-55)"><path d="M-30,-88 L-30,-22 M-63,-55 L3,-55" stroke="${INK}" stroke-width="5"/></g><path d="M30,-90 l40,0 M30,-70 l40,0 M30,-50 l40,0 M30,-30 l40,0" ${o(3)}/></g>`;
+    bg += `<path d="M1000,720 L1000,640 L1050,640" fill="none" stroke="#b9bcc6" stroke-width="22"/><path d="M1000,720 L1000,640 L1050,640" fill="none" ${o(3)}/>`;
+    bg += stringLights(120, 1580, 640, 24, t, ["#ffe39a", "#ffd0a0", "#fff2c0"]);
+    bg += bigPlant(1320, 760, 0.55, t, "#c06a5a") + bigPlant(160, 760, 0.6, t, "#5b8fd9");
     return { bg, fg };
   },
 
@@ -200,9 +245,17 @@ export const EXTRA_SCENES = {
     for (const x of [140, 1780]) bg += `<g transform="translate(${x},620)"><rect x="-110" y="-380" width="220" height="380" fill="#22202b" ${o(5)}/><circle cy="-280" r="${54 * pulse}" fill="#3d3a4a" ${o(4)}/><circle cy="-110" r="${70 * pulse}" fill="#3d3a4a" ${o(4)}/></g>`;
     for (const [i, x] of [[0, 700], [1, 960], [2, 1220]].entries()) { const j = Math.abs(S(t * 7 + i)) * 14; bg += `<g transform="translate(${x},${560 - j})"><circle cy="-170" r="34" fill="#2a1f4a"/><path d="M0,-136 L0,-50 M0,-50 L-30,0 M0,-50 L30,0 M0,-115 L-40,-70 M0,-115 L40,-80" stroke="#2a1f4a" stroke-width="12" stroke-linecap="round"/></g>`; }
     bg += `<rect y="620" width="${W}" height="${1080 - 620}" fill="#4a2f6a"/>`;
+    // LED wall with an equaliser, truss lights, mic stands, haze, phone lights in the crowd, confetti
+    bg += `<rect x="420" y="160" width="1080" height="290" rx="10" fill="#160f2e" ${o(5)}/>`;
+    for (let i = 0; i < 24; i++) { const h = 30 + Math.abs(Math.sin(t * 5 + i * 0.7) * Math.cos(t * 3.1 + i)) * 220; bg += `<rect x="${440 + i * 44}" y="${440 - h}" width="34" height="${h}" rx="4" fill="${["#ff6bb5", "#6bd4ff", "#ffe36b"][Math.floor(i / 8)]}" opacity=".8"/>`; }
+    bg += `<path d="M0,40 L${W},40 M0,80 L${W},80" stroke="#6a5f80" stroke-width="5"/>` + [...Array(24)].map((_, i) => `<path d="M${i * 80},40 L${i * 80 + 40},80 L${i * 80 + 80},40" fill="none" stroke="#6a5f80" stroke-width="4"/>`).join("");
+    for (const x of [560, 1360]) bg += `<path d="M${x},560 L${x},400 M${x - 30},560 L${x + 30},560 M${x},400 L${x + 30},380" ${o(5)}/><ellipse cx="${x + 36}" cy="376" rx="10" ry="14" fill="#555" ${o(3)}/>`;
+    bg += `<rect y="${FLOOR - 160}" width="${W}" height="200" fill="#fff" opacity="${0.06 + 0.03 * Math.sin(t)}"/>`;
     // bouncing crowd heads (foreground)
     let fg = "";
     for (let i = 0; i < 26; i++) { const x = i * 78 - 10, b = Math.abs(S(t * 6 + i * 0.7)) * 22; fg += `<circle cx="${x}" cy="${1000 - b}" r="44" fill="#2a1f4a"/>`; if (i % 4 === 1) fg += `<path d="M${x + 20},${960 - b} L${x + 40},${860 - b}" stroke="#2a1f4a" stroke-width="14" stroke-linecap="round"/>`; }
+    for (let i = 0; i < 9; i++) { const x = 60 + i * 210 + Math.sin(t * 2 + i) * 20, y = 880 - Math.abs(Math.sin(t * 6 + i)) * 20; if (i % 2) fg += `<rect x="${x}" y="${y}" width="22" height="36" rx="4" fill="#fff" opacity=".85"/><circle cx="${x + 11}" cy="${y + 18}" r="40" fill="#fff" opacity=".12"/>`; }
+    fg += confetti(t, 22, 1920, 1000);
     return { bg, fg };
   },
 };
