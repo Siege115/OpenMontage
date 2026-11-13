@@ -22,19 +22,19 @@ Alternatives / Test & Compare:
 ```
 What if you woke up tomorrow and could hear everyone's thoughts? Every secret, every opinion… every random little idea.
 
-Eddie gets the power, and at first it's amazing: the job interview, the barista's compliments, winning every game night. Then rush hour hits. Then his best friend thinks something he can't un-hear. And then he meets Mia, the one person whose mind is completely silent… and finds out why.
+Eddie gets the power, and at first it's amazing: the job interview, the barista's compliments, winning every poker night. Then rush hour hits. Then his best friend thinks something he can't un-hear. And then he meets Mia, the one person whose mind is completely silent… and finds out why.
 
 ⏱️ CHAPTERS
 0:00 The power
 0:25 Day 1 – Winning at life
 0:48 Day 3 – Rush hour in your head (quiz!)
-1:27 Day 7 – The party (quiz!)
-2:08 Day 10 – Game night
-2:23 Day 14 – The unfiltered truth
+1:26 Day 7 – The party (quiz!)
+2:09 Day 10 – Poker night
+2:24 Day 14 – The unfiltered truth
 2:51 Day 21 – Mia
-3:22 Day 30 – The twist
+3:23 Day 30 – The twist
 3:57 The answer
-4:09 One more thing…
+4:10 One more thing…
 
 💬 Would you want this power? And who do you think the barista is? 👀
 
