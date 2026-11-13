@@ -194,6 +194,7 @@ const TR = BEATS.map((b, i) => {
   if (i === 0 || sceneKey(BEATS[i - 1]) === sceneKey(b)) return null;
   if (b.transition) return b.transition;
   if (IMPACT_POSES.has(b.pose)) return "cut";
+  if (b.scene?.name === "studio" && BEATS[i - 1].scene?.name === "studio") return "slide"; // fact to fact: keep momentum
   if (BEATS[i - 1].scene?.name === b.scene?.name) return "dip"; // same place, later time
   return ["whip", "slide", "whip", "iris"][i % 4];
 });
