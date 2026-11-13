@@ -46,6 +46,7 @@ const VOICE_CHAIN = [
 ].join(",");
 const sceneKeyOf = (b) => JSON.stringify(b.scene ?? null);
 const OW = VERTICAL ? 1080 : 1920, OH = VERTICAL ? 1920 : 1080, BASE = OH / H;
+const CAP_Y = VERTICAL ? 1770 : 1010; // caption baseline: the floor strip under the characters' feet
 const sh = (cmd, a, o) => execFileSync(cmd, a, o);
 const dur = (f) => Number(sh("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString());
 
@@ -587,12 +588,14 @@ function frameSVG(t) {
       lines.map((l, j) => { const q = seg(lt, 0.18 + stagger(j, lines.length, 0.07), 0.3, EASE.power3.out);
         return `<text x="0" y="${(-bh / 2 + 88 + j * 96 + (1 - q) * 26).toFixed(1)}" opacity="${q.toFixed(3)}" text-anchor="middle" font-size="76" fill="#000" style="${M}">${esc(l)}</text>`; }).join("") + `</g>`;
   }
+  // captions live in the strip below everyone's feet, over a soft dark band so they always read
+  if (b.chunks.length && lt < b.speech + 0.4) s += `<rect x="0" y="${CAP_Y - 110}" width="${OW}" height="${OH - CAP_Y + 110}" fill="url(#capBand)" opacity="${Math.min(1, lt / 0.25, (b.speech + 0.4 - lt) / 0.25).toFixed(3)}"/>`;
   // kinetic captions: words rise in on their own cue (power3.out), the spoken word lights up
   const ch = b.chunks.find((c, j) => lt >= c.s - 0.08 && lt < (b.chunks[j + 1]?.s ?? c.e + 0.35) - 0.08);
   if (ch) {
-    const maxW = VERTICAL ? 960 : 1650, base = VERTICAL ? 100 : 88;
+    const maxW = VERTICAL ? 960 : 1650, base = VERTICAL ? 92 : 76;
     const raw = ch.words.reduce((n, w) => n + (WIDTH[w.w] ?? w.w.length * 70), 0) + SPACE * (ch.words.length - 1);
-    const fs = Math.min(base, (maxW / raw) * 100), k = fs / 100, cy = VERTICAL ? 1300 : 920;
+    const fs = Math.min(base, (maxW / raw) * 100), k = fs / 100, cy = CAP_Y;
     let x = OW / 2 - (raw * k) / 2;
     for (const w of ch.words) {
       const ww = (WIDTH[w.w] ?? w.w.length * 70) * k, q = seg(lt, w.s - 0.07, 0.2, EASE.power3.out);
@@ -644,6 +647,7 @@ function frameSVG(t) {
     <filter id="lit-night"><feColorMatrix type="matrix" values="0.78 0 0 0 0.02  0 0.82 0 0 0.03  0 0 0.95 0 0.08  0 0 0 1 0"/></filter>
     <filter id="lit-sunset"><feColorMatrix type="matrix" values="1 0 0 0 0.04  0 0.9 0 0 0.02  0 0 0.8 0 0  0 0 0 1 0"/></filter>
     <filter id="lit-party"><feColorMatrix type="matrix" values="0.95 0 0 0 0.015  0 0.9 0 0 0  0 0 0.98 0 0.03  0 0 0 1 0"/></filter>
+    <linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.32"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient>
     <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient>
     </defs>${s}</svg>`;
 }

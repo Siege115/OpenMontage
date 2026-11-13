@@ -135,18 +135,52 @@ export const SCENES = {
       bg += `<circle cx="1640" cy="140" r="60" fill="#f6f1d8" ${o(4)}/><circle cx="1620" cy="125" r="10" fill="#e6dfbf"/><circle cx="1660" cy="160" r="7" fill="#e6dfbf"/>`;
     }
     const HB = FLOOR - 70; // houses sit back behind the car lane
-    const house = (x, w, h, col, lit) => {
-      let s = `<rect x="${x}" y="${HB - h}" width="${w}" height="${h}" fill="${col}" ${o(5)}/><path d="M${x - 20},${HB - h} L${x + w / 2},${HB - h - 110} L${x + w + 20},${HB - h} Z" fill="#5a4a5e" ${o(5)}/>`;
-      for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
-        const on = lit && r === 0 && c === 1;
-        s += `<rect x="${x + 30 + c * (w - 120)}" y="${HB - h + 40 + r * 110}" width="60" height="70" fill="${day ? "#cfe9f7" : on ? "#ffe39a" : "#2d3554"}" ${o(4)}/>`;
+    // distant skyline + hills, faded by atmosphere
+    bg += `<path d="M0,${HB - 250} Q240,${HB - 330} 520,${HB - 270} Q800,${HB - 360} 1120,${HB - 280} Q1450,${HB - 350} 1700,${HB - 270} Q1820,${HB - 300} ${W},${HB - 260} L${W},${HB} L0,${HB} Z" fill="${day ? "#a9d3b0" : "#2f3c5c"}" opacity=".8"/>`;
+    for (const [x, w, h] of [[170, 80, 260], [270, 60, 330], [350, 90, 220], [880, 70, 300], [960, 100, 380], [1080, 60, 260], [1560, 90, 290], [1660, 70, 350]]) {
+      bg += `<rect x="${x}" y="${HB - 180 - h}" width="${w}" height="${h}" fill="${day ? "#b9cfe0" : "#39466a"}" opacity=".9"/>`;
+      for (let wy = HB - 160 - h; wy < HB - 200; wy += 34) for (let wx = x + 12; wx < x + w - 12; wx += 22) bg += `<rect x="${wx}" y="${wy}" width="9" height="13" fill="${day ? "#d8e6f0" : ((wx * 7 + wy) % 5 < 2 ? "#ffe39a" : "#2d3554")}"/>`;
+    }
+    // power line poles with sagging wires and a couple of birds
+    bg += `<path d="M470,${HB} L470,${HB - 470} M440,${HB - 450} L500,${HB - 450} M1520,${HB} L1520,${HB - 470} M1490,${HB - 450} L1550,${HB - 450}" ${o(6)}/>`;
+    for (const dy of [0, 22]) bg += `<path d="M-20,${HB - 400 + dy} Q230,${HB - 330 + dy} 470,${HB - 450 + dy} Q995,${HB - 330 + dy} 1520,${HB - 450 + dy} Q1730,${HB - 360 + dy} ${W + 20},${HB - 420 + dy}" fill="none" stroke="${INK}" stroke-width="2.5"/>`;
+    for (const [bx, by] of [[760, HB - 398], [800, HB - 394]]) { const hop = Math.max(0, Math.sin(t * 2.3 + bx)) ** 8 * 8; bg += `<g transform="translate(${bx},${by - hop})"><ellipse cx="0" cy="-9" rx="12" ry="9" fill="#3b3f4c"/><circle cx="9" cy="-17" r="6" fill="#3b3f4c"/><path d="M14,-17 L20,-15 L14,-13 Z" fill="#f2b84b"/></g>`; }
+    const tree = (x, k, sway) => `<g transform="translate(${x},${HB}) scale(${k})"><path d="M-10,0 L-8,-150 L8,-150 L10,0 Z" fill="#7a5a43" ${o(4)}/><g transform="rotate(${Math.sin(t * 0.9 + sway) * 1.5},0,-150)">
+      <circle cx="-50" cy="-180" r="62" fill="${day ? "#5f9e6e" : "#2f5546"}" ${o(4)}/><circle cx="48" cy="-185" r="58" fill="${day ? "#5f9e6e" : "#2f5546"}" ${o(4)}/><circle cx="0" cy="-245" r="70" fill="${day ? "#6fb27c" : "#376250"}" ${o(4)}/>
+      <circle cx="-20" cy="-262" r="22" fill="${day ? "#8cc995" : "#43735d"}"/><circle cx="34" cy="-205" r="16" fill="${day ? "#8cc995" : "#43735d"}"/></g></g>`;
+    const house = (x, w, h, col, roof, lit, trim) => {
+      const top = HB - h;
+      let s = `<rect x="${x + w - 90}" y="${top - 100}" width="40" height="80" fill="#8a6a5a" ${o(4)}/>`; // chimney
+      s += `<rect x="${x}" y="${top}" width="${w}" height="${h}" fill="${col}" ${o(5)}/>`;
+      for (let yy = top + 30; yy < HB; yy += 30) s += `<path d="M${x + 4},${yy} L${x + w - 4},${yy}" stroke="#000" stroke-opacity=".06" stroke-width="3"/>`; // siding
+      s += `<path d="M${x - 24},${top} L${x + w / 2},${top - 115} L${x + w + 24},${top} Z" fill="${roof}" ${o(5)}/><path d="M${x + w / 2 - 20},${top - 45} a20,20 0 1,1 40,0 a20,20 0 1,1 -40,0" fill="${day ? "#cfe9f7" : "#ffe39a"}" ${o(3)}/>`;
+      for (let r = 0; r < 2; r++) for (const c of [0, 1]) {
+        const on = lit && (r + c) % 2 === 0, wx = x + 30 + c * (w - 120), wy = top + 40 + r * 110;
+        s += `<rect x="${wx - 14}" y="${wy}" width="12" height="70" fill="${trim}" ${o(3)}/><rect x="${wx + 62}" y="${wy}" width="12" height="70" fill="${trim}" ${o(3)}/>`; // shutters
+        s += `<rect x="${wx}" y="${wy}" width="60" height="70" fill="${day ? "#cfe9f7" : on ? "#ffe39a" : "#2d3554"}" ${o(4)}/><path d="M${wx + 30},${wy} L${wx + 30},${wy + 70} M${wx},${wy + 35} L${wx + 60},${wy + 35}" stroke="${INK}" stroke-width="3"/>`;
+        if (r === 1) s += `<rect x="${wx - 6}" y="${wy + 70}" width="72" height="16" fill="#9a6b4f" ${o(3)}/>` + [8, 26, 44, 60].map((fx, j) => `<circle cx="${wx + fx}" cy="${wy + 68}" r="7" fill="${["#e5584f", "#f7d774", "#f29ac0", "#e5584f"][j]}" ${o(2)}/>`).join(""); // flower box
       }
-      return s + `<rect x="${x + w / 2 - 30}" y="${HB - 120}" width="60" height="120" fill="#6b5a4a" ${o(4)}/>`;
+      s += `<rect x="${x + w / 2 - 34}" y="${HB - 128}" width="68" height="128" fill="${trim}" ${o(4)}/><rect x="${x + w / 2 - 26}" y="${HB - 120}" width="52" height="120" fill="#6b5a4a" ${o(3)}/><circle cx="${x + w / 2 + 14}" cy="${HB - 58}" r="4" fill="#f2c85b"/>`;
+      return s;
     };
-    bg += house(60, 360, 300, "#8a7fa8", false) + house(520, 300, 260, "#7f9cb0", false) + house(1330, 360, 320, "#a88f7f", true) + house(1740, 260, 250, "#7fa895", false);
+    bg += tree(455, 1.0, 1) + tree(1250, 1.15, 2.5);
+    bg += house(60, 360, 300, "#8a7fa8", "#5a4a5e", false, "#f1e6d2") + house(560, 300, 260, "#7f9cb0", "#7a4f4f", !day, "#f4efe4");
+    // corner shop with a striped awning
+    bg += `<rect x="900" y="${HB - 280}" width="340" height="280" fill="#e2b679" ${o(5)}/><rect x="890" y="${HB - 300}" width="360" height="34" fill="#c98d4f" ${o(5)}/><text x="1070" y="${HB - 276}" text-anchor="middle" font-size="26" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">CORNER SHOP</text>`;
+    bg += `<rect x="930" y="${HB - 200}" width="160" height="150" fill="${day ? "#cfe9f7" : "#ffe39a"}" ${o(4)}/><rect x="1120" y="${HB - 200}" width="90" height="200" fill="#6b5a4a" ${o(4)}/>`;
+    for (let k = 0; k < 7; k++) bg += `<path d="M${900 + k * 49},${HB - 262} L${949 + k * 49},${HB - 262} L${949 + k * 49},${HB - 225} Q${924 + k * 49},${HB - 205} ${900 + k * 49},${HB - 225} Z" fill="${k % 2 ? "#fff" : "#e5584f"}" stroke="${INK}" stroke-width="3"/>`;
+    bg += [[960, "#e5584f"], [1000, "#f7d774"], [1040, "#8fc49a"]].map(([fx, c]) => `<circle cx="${fx}" cy="${HB - 80}" r="14" fill="${c}" ${o(3)}/>`).join("");
+    bg += house(1330, 360, 320, "#a88f7f", "#4f5a7a", true, "#f6efe0") + house(1740, 260, 250, "#7fa895", "#5a4a5e", false, "#f1e6d2");
+    // hedges + picket fences along the lane
+    for (const [hx, hw] of [[30, 230], [1340, 140], [1600, 110]]) bg += `<path d="M${hx},${HB} ${Array.from({ length: Math.ceil(hw / 40) }, (_, j) => `a20,20 0 0,1 40,0`).join(" ")} Z" fill="${day ? "#5f9e6e" : "#2f5546"}" ${o(4)}/>`;
+    for (let fx = 600; fx < 860; fx += 22) bg += `<path d="M${fx},${HB} L${fx},${HB - 46} L${fx + 7},${HB - 56} L${fx + 14},${HB - 46} L${fx + 14},${HB} Z" fill="#f4efe4" stroke="${INK}" stroke-width="2.5"/>`;
+    bg += `<path d="M596,${HB - 32} L866,${HB - 32}" stroke="${INK}" stroke-width="3"/>`;
+    // mailbox + hydrant tucked by the houses
+    bg += `<path d="M300,${HB} L300,${HB - 60}" ${o(5)}/><path d="M280,${HB - 60} L280,${HB - 88} Q300,${HB - 104} 320,${HB - 88} L320,${HB - 60} Z" fill="#5b8fd9" ${o(4)}/><path d="M320,${HB - 92} L320,${HB - 112} L334,${HB - 108} L320,${HB - 104}" fill="#e5584f" ${o(2)}/>`;
+    bg += `<path d="M1275,${HB} L1275,${HB - 44} Q1287,${HB - 60} 1299,${HB - 44} L1299,${HB} Z M1268,${HB - 30} L1306,${HB - 30}" fill="#e5584f" ${o(4)}/>`;
     if (!day) bg += glow(1390 + 120, 250, 140, "#ffe39a", 0.35);
     // street lamp
-    bg += `<path d="M1080,${FLOOR} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="${day ? "#eee" : "#ffe39a"}" ${o(4)}/>` + (day ? "" : glow(1170, 450, 330, "#ffe39a", 0.4));
+    bg += `<g transform="translate(-570,0)"><path d="M1080,${HB} L1080,420 Q1080,380 1130,380 L1170,380" fill="none" ${o(8)}/><path d="M1145,380 L1195,380 L1185,410 L1155,410 Z" fill="${day ? "#eee" : "#ffe39a"}" ${o(4)}/></g>` + (day ? "" : glow(600, 450, 330, "#ffe39a", 0.4));
     // back lane with cars at believable scale (behind the characters, never in front of them)
     bg += `<rect x="0" y="${HB}" width="${W}" height="${FLOOR - HB}" fill="${day ? "#7d828f" : "#454a58"}"/><path d="M0,${HB} L${W},${HB}" ${o(4)}/>`;
     for (const [i, [spd, col]] of [[260, "#e5584f"], [-190, "#5b8fd9"]].entries()) {
@@ -156,6 +190,9 @@ export const SCENES = {
         <rect x="176" y="-14" width="14" height="10" rx="3" fill="${day ? "#fff6c8" : "#ffe39a"}" stroke="${INK}" stroke-width="1.2"/><circle cx="-80" cy="40" r="26" fill="#2b2f3a" stroke="${INK}" stroke-width="2.4"/><circle cx="-80" cy="40" r="10" fill="#9aa0ad"/><circle cx="120" cy="40" r="26" fill="#2b2f3a" stroke="${INK}" stroke-width="2.4"/><circle cx="120" cy="40" r="10" fill="#9aa0ad"/></g>`;
     }
     bg += `<rect x="0" y="${FLOOR}" width="${W}" height="70" fill="#9aa0ad"/><path d="M0,${FLOOR} L${W},${FLOOR} M0,${FLOOR + 70} L${W},${FLOOR + 70}" ${o(5)}/><rect x="0" y="${FLOOR + 70}" width="${W}" height="200" fill="#4b4f5c"/>`;
+    for (let x = 0; x < W; x += 120) bg += `<path d="M${x},${FLOOR} L${x - 18},${FLOOR + 70}" stroke="#80869a" stroke-width="3"/>`;
+    bg += `<rect x="0" y="${FLOOR + 62}" width="${W}" height="12" fill="#c9cdd6" stroke="${INK}" stroke-width="3"/>`;
+    for (let x = 90; x < W; x += 420) bg += `<path d="M${x},${FLOOR + 100} q30,-12 60,0 q-30,16 -60,0" fill="#3f434f"/>`; // road patches
     for (let x = 40; x < W; x += 260) bg += `<rect x="${x}" y="${FLOOR + 140}" width="140" height="14" rx="6" fill="#e8e3c8"/>`;
     return { bg, fg: "" };
   },
