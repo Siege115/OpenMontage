@@ -99,7 +99,7 @@ export const BEATS = [
 
   // ================= DAY 14: unfiltered =================
   { pose: "giveGift", day: "DAY 14", x: 760, scene: { name: "living" }, people: [{ x: 1300, ...MOM, flip: true }],
-    items: [ON(SAY("I love it!", 1300, 250, 1.2, -1), "loves"), ON(T("where am I going|to put this?", 1300, 90, 2.6, -1, 0.9), "head")],
+    items: [ON(SAY("I love it!", 1120, 280, 1.2, 1), "loves"), ON(T("where am I going|to put this?", 1530, 200, 2.6, -1, 0.9), "head")],
     text: "Two weeks in, the unfiltered truth arrives. Your mom loves your gift. Out loud. In her head? Not so much." },
   { pose: "shrug", x: 960, scene: { name: "street", day: true },
     people: [{ x: 420, acc: "beanie" }, { x: 1520, acc: "cap:#e5584f", flip: true }],

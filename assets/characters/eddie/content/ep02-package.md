@@ -27,14 +27,14 @@ Eddie gets the power, and at first it's amazing: the job interview, the barista'
 ⏱️ CHAPTERS
 0:00 The power
 0:25 Day 1 – Winning at life
-0:47 Day 3 – Rush hour in your head (quiz!)
-1:22 Day 7 – The party (quiz!)
-2:01 Day 10 – Game night
-2:16 Day 14 – The unfiltered truth
-2:42 Day 21 – Mia
-3:13 Day 30 – The twist
-3:48 The answer
-4:00 One more thing…
+0:48 Day 3 – Rush hour in your head (quiz!)
+1:27 Day 7 – The party (quiz!)
+2:08 Day 10 – Game night
+2:23 Day 14 – The unfiltered truth
+2:51 Day 21 – Mia
+3:22 Day 30 – The twist
+3:57 The answer
+4:09 One more thing…
 
 💬 Would you want this power? And who do you think the barista is? 👀
 
@@ -58,7 +58,7 @@ Eddie gets the power, and at first it's amazing: the job interview, the barista'
 ## End screen
 Episode 1 ("What If You Never Had to Sleep Again?") plus Subscribe.
 
-## Short (`ep02-short-9x16.mp4`, 1:22, hook → Day 3 quiz)
+## Short (`ep02-short-9x16.mp4`, 1:27, hook → Day 3 quiz + the duck)
 - **Title:** What If You Could Hear Everyone's Thoughts? 🤯
 - **Description:** `Day 1: you ace the interview. Day 3: rush hour in your head. Full Day 1 → Day 30 story on the channel. #WhatIf #Shorts`
 - **Related video:** the full episode 2.
