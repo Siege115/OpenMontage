@@ -286,7 +286,7 @@ const NO_BLINK = new Set(["calm", "strain", "blink"]);
 const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stand", "idea", "celebrate", "hustle", "coffee", "highFive", "giveGift", "listen", "sitBench"]);
 
 function placement(b, lt) {
-  let x = b.x ?? (b.card && !VERTICAL ? 640 : W / 2);
+  let x = b.x ?? (b.quiz && !VERTICAL ? 360 : b.card && !VERTICAL ? 640 : W / 2);
   if (b.walk) x = b.walk[0] + (b.walk[1] - b.walk[0]) * Math.min(1, lt / b.dur);
   const lib = POSE_LIB[b.pose], y = b.y ?? (GROUND - (lib.sitH ?? (lib.sit ? 58 : 130)) * SCALE);
   return [x, y];
@@ -295,7 +295,7 @@ function placement(b, lt) {
 for (const [i, b] of BEATS.entries()) {
   const n = Math.max(1, Math.round(b.dur / 2.1));
   const classroom = b.scene?.name === "classroom";
-  const thoughts = (b.items ?? []).some((it) => it.type === "thought" || it.type === "say");
+  const thoughts = (b.items ?? []).some((it) => it.type === "thought" || it.type === "say") || !!b.quiz;
   const pool = classroom ? (VERTICAL ? ["board", "medium"] : ["wide", "push"])
     : thoughts && !VERTICAL ? ["wide", "push"]
     : (b.card && !VERTICAL) || b.items?.length ? ["wide", "medium"] : ["wide", "medium", "close"];
@@ -581,9 +581,9 @@ function frameSVG(t) {
   }
   // quiz: three options pop in one by one, a clock ticks, the answer lights up green at the end
   if (b.quiz) {
-    const qz = b.quiz, cyq = VERTICAL ? 520 : 300, w = VERTICAL ? 300 : 340, gap = 30, x0 = OW / 2 - (3 * w + 2 * gap) / 2;
+    const qz = b.quiz, cyq = VERTICAL ? 1560 : 420, w = VERTICAL ? 300 : 340, gap = 30, qcx = VERTICAL ? OW / 2 : OW / 2 + 230, x0 = qcx - (3 * w + 2 * gap) / 2;
     const reveal = lt >= b.dur - 1.2, qa = seg(lt, 0.1, 0.35, EASE.back.out);
-    s += `<g transform="translate(${OW / 2},${cyq - 120}) scale(${qa.toFixed(3)})"><rect x="-330" y="-48" width="660" height="88" rx="44" fill="#1b1b22" stroke="#000" stroke-width="5"/><text x="0" y="16" text-anchor="middle" font-size="46" fill="#fff" style="${M}">${esc(qz.q)}</text></g>`;
+    s += `<g transform="translate(${qcx},${cyq - 120}) scale(${qa.toFixed(3)})"><rect x="-330" y="-48" width="660" height="88" rx="44" fill="#1b1b22" stroke="#000" stroke-width="5"/><text x="0" y="16" text-anchor="middle" font-size="46" fill="#fff" style="${M}">${esc(qz.q)}</text></g>`;
     qz.options.forEach((o, j) => {
       const t0q = qz.at?.[j] ?? 0.9 + j * 0.7, sp = spring(lt - t0q, { stiffness: 280, damping: 14 }), right = reveal && j === qz.answer, wrong = reveal && j !== qz.answer;
       if (sp <= 0) return;
