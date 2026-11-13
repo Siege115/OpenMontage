@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { character, head, resolvePose, lerpPose, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
+import { character, head, resolvePose, lerpPose, gait, applyAct, POSES, PROPS, PALETTE } from "./eddie-rig.mjs";
 import { SCENES as BASE_SCENES } from "./scenes.mjs";
 import { EXTRA_SCENES } from "./scenes-extra.mjs";
 import { EASE, spring, seg, life, keys, stagger, lerp } from "./motion.mjs";
@@ -166,6 +166,10 @@ for (const b of BEATS) {
     b.quiz.countFrom = b.speech + 0.15; b.quiz.revealAt = b.dur - 0.45; // countdown runs in the silent pause, then the answer lights up
   }
   for (const it of b.items ?? []) if (it.type === "duck" && it.quackOn) { const w = wordAt(b, it.quackOn); if (w) it.quackAt = w.t; }
+  // acting keys may be cued on a narration word: { on: "word", off: -0.3 } (off shifts the key)
+  const cueKeys = (keys) => { for (const k of keys ?? []) if (k.on) { const w = wordAt(b, k.on); k.at = Math.max(0, (w ? w.t : 0) + (k.off ?? 0)); } };
+  cueKeys(b.act); for (const pp of b.people ?? []) cueKeys(pp.act);
+  if (b.crumbs?.on) { const w = wordAt(b, b.crumbs.on); b.crumbs.at = Math.max(0, (w ? w.t : 0) + (b.crumbs.off ?? 0)); }
   // card table: each word in winOn slides the pot to Eddie
   for (const it of b.items ?? []) if (it.winOn) { let from = 0; it.winAt = it.winOn.map((tok) => { const w = wordAt(b, tok, from); if (w) { from = w.idx; return w.t; } return null; }).filter((x) => x !== null); }
 }
@@ -210,6 +214,7 @@ for (const [k, [src, fx]] of Object.entries(SFX)) {
   sfxPcm[k] = readPcm(f);
 }
 const POSE_LIB = { ...POSES, stand: { expr: "neutral" } };
+
 const sceneKey = (b) => JSON.stringify(b.scene ?? null);
 // ---- transition chosen by meaning (MOTION.md §6) ----
 const IMPACT_POSES = new Set(["shocked", "scared", "panic", "coverEars"]);
@@ -254,6 +259,13 @@ if (SFX_AVAILABLE) {
     if (b.riser) cue("riser-2s-soft", t0 + b.riser);
     if (b.quiz) { b.quiz.at.forEach((a) => cue("pop-medium-in", t0 + a + 0.05, -2)); cue("time-countdown", t0 + b.quiz.countFrom, -4); cue("notification-success-chime", t0 + b.quiz.revealAt, -1); }
     for (const it of b.items ?? []) if (it.type === "duck" && it.quackAt !== undefined) quacks.push(t0 + it.quackAt);
+    for (const k of [...(b.act ?? []), ...(b.people ?? []).flatMap((p) => p.act ?? [])]) if (k.sfx) cue(k.sfx, t0 + k.at + (k.dur ?? 0.45) * (k.sfxAt ?? 1), k.sfxDb ?? -4);
+    if (b.crumbs?.at !== undefined) { cue("swish-soft", t0 + b.crumbs.at + 0.05, -6); cue("foley-paper-touch", t0 + b.crumbs.at + 0.9, -8); }
+    for (const [pi, pp] of (b.people ?? []).entries()) {
+      if (pp.pose === "read" || pp.anim === "read") for (let c = 3.3 - ((pi * 0.9) % 4.2); c < b.dur; c += 4.2) if (c > 0.2) cue("props-page-turn", t0 + c + 0.3, -9);
+      if (pp.anim === "write") cue("writing-pen-write", t0 + 0.6, -12);
+      if (pp.anim === "wipe") cue("foley-fabric-slide", t0 + 0.8, -10);
+    }
     for (const it of b.items ?? []) if (it.type === "pokerTable") {
       cue("foley-card-slide", t0 + 0.25, -6); cue("foley-card-touch", t0 + 0.9, -8);
       for (const w of it.winAt ?? []) { cue("money-coins-pour", t0 + w + 0.05, -7); cue("money-coin-stack", t0 + w + 0.45, -8); }
@@ -268,7 +280,43 @@ if (SFX_AVAILABLE) {
     const q = readPcm(qf);
     for (const at of quacks) { const o = Math.floor(at * 44100); for (let j = 0; j < q.length && o + j < mix.length; j++) mix[o + j] += (q[j] / 32768) * 0.45; }
   }
-  console.log(`sfx: ${placed.length} SFX Kit cues`);
+  // footsteps: one soft scuff per foot contact (same distance maths as the gait)
+  const stepF = join(sfxDir, "step.wav");
+  if (!existsSync(stepF)) sh("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "anoisesrc=d=0.12:c=brown:a=0.9,afade=t=out:st=0.01:d=0.11", "-f", "lavfi", "-i", "aevalsrc='0.7*sin(2*PI*90*t)*exp(-t*45)':d=0.12", "-filter_complex", "[0][1]amix=inputs=2,lowpass=f=1800,highpass=f=60,volume=2.5", "-ar", "44100", "-ac", "1", stepF]);
+  const stepPcm = readPcm(stepF);
+  const addAt = (pcm, at, g) => { const o = Math.floor(at * 44100); for (let j = 0; j < pcm.length && o + j < mix.length; j++) if (o + j >= 0) mix[o + j] += (pcm[j] / 32768) * g; };
+  let steps = 0;
+  for (const b of BEATS) {
+    const walkers = [];
+    if (b.walk && (b.pose === "walk" || b.pose === "run")) walkers.push({ dist: (lt) => Math.abs(placement(b, lt)[0] - b.walk[0]) / SCALE, cycle: b.pose === "run" ? 120 : 124, g: b.pose === "run" ? 0.32 : 0.22, end: b.walkDur ?? b.dur });
+    for (const pp of b.people ?? []) if (pp.walk) { const ps = SCALE * (pp.s ?? 0.92); walkers.push({ dist: (lt) => Math.abs(pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) / ps, cycle: 124, g: 0.1, end: b.dur }); }
+    for (const w of walkers) { let last = 0; for (let lt = 0; lt < w.end; lt += 1 / 240) { const n = Math.floor(w.dist(lt) / (w.cycle / 2)); if (n > last) { addAt(stepPcm, b.start + lt, w.g * (0.85 + 0.3 * ((n * 7) % 3) / 2)); steps++; } last = n; } }
+  }
+  // ambience beds per location (synthesised room tones), crossfaded at scene cuts, kept well under the voice
+  const AMB = {
+    subway: "anoisesrc=d=12:c=brown:a=0.8,lowpass=f=260,volume=1.4,tremolo=f=1.1:d=0.35",
+    cafe: "anoisesrc=d=12:c=pink:a=0.5,bandpass=f=700:w=900,tremolo=f=3.3:d=0.5,volume=0.8",
+    party: "anoisesrc=d=12:c=pink:a=0.6,bandpass=f=900:w=1200,tremolo=f=4.1:d=0.6,volume=1.1",
+    concert: "anoisesrc=d=12:c=pink:a=0.8,bandpass=f=1100:w=1600,tremolo=f=2.2:d=0.5,volume=1.4",
+    street: "anoisesrc=d=12:c=brown:a=0.6,lowpass=f=500,tremolo=f=0.15:d=0.7,volume=1.0",
+    park: "anoisesrc=d=12:c=pink:a=0.25,lowpass=f=700,volume=0.6",
+    rooftop: "anoisesrc=d=12:c=brown:a=0.6,lowpass=f=380,tremolo=f=0.2:d=0.6,volume=0.9",
+    office: "anoisesrc=d=12:c=pink:a=0.15,lowpass=f=900,volume=0.5",
+    library: "anoisesrc=d=12:c=pink:a=0.08,lowpass=f=800,volume=0.4",
+  };
+  const ambPcm = {};
+  for (const b of BEATS) {
+    const nm = b.scene?.name, spec = AMB[nm]; if (!spec) continue;
+    if (!ambPcm[nm]) { const f = join(sfxDir, `amb-${nm}.wav`); if (!existsSync(f)) sh("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", spec, "-ar", "44100", "-ac", "1", f]); ambPcm[nm] = readPcm(f); }
+    const a = ambPcm[nm], o = Math.floor(b.start * 44100), n = Math.floor(b.dur * 44100), fade = 0.25 * 44100, g = 0.045;
+    for (let j = 0; j < n && o + j < mix.length; j++) mix[o + j] += (a[(o + j) % a.length] / 32768) * g * Math.min(1, j / fade, (n - j) / fade);
+    // birdsong in the park: short rising chirps
+    if (nm === "park") for (let c = 0.4; c < b.dur; c += 1.3 + ((c * 7.3) % 1.1)) {
+      const at = b.start + c, f0 = 2600 + ((c * 997) % 900);
+      for (let j = 0; j < 0.09 * 44100; j++) { const tt = j / 44100, k = Math.floor(at * 44100) + j; if (k < mix.length) mix[k] += 0.05 * Math.sin(2 * Math.PI * (f0 * tt + 9000 * tt * tt)) * Math.sin(Math.PI * tt / 0.09); }
+    }
+  }
+  console.log(`sfx: ${placed.length} SFX Kit cues, ${steps} footsteps`);
 } else {
   for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
 }
@@ -378,6 +426,46 @@ function camera(type, prog, cx, py, pose, inOut, custom) {
 const DAYS = []; BEATS.forEach((b, i) => { if (b.day && b.day !== "-") DAYS.push({ label: b.day.replace("DAY ", "D"), start: b.start }); else if (b.day === "-" && DAYS.length && !DAYS.endMark) { DAYS.endMark = true; DAYS[DAYS.length - 1].end = b.start; } });
 if (DAYS.length) DAYS[DAYS.length - 1].end ??= TOTAL;
 const sceneIdx = new Map(); { let n = 0; BEATS.forEach((b, i) => { if (i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b)) sceneIdx.set(i, n++); }); }
+// Screen-space boxes of everyone's head + arms (and thought bubbles) at beat-local time lt.
+function obstacles(b, lt) {
+  const shot = b.shots.find((x) => lt < x.e) ?? b.shots[b.shots.length - 1];
+  const [cx, py] = placement(b, lt);
+  const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0, shot.custom);
+  const toS = (x, y) => [OW / 2 + (x - cam.fx) * cam.s, OH / 2 + (y - cam.fy) * cam.s];
+  const box = (x0, y0, x1, y1) => { const [a, c] = toS(x0, y0), [d, e] = toS(x1, y1); return [a, c, d, e]; };
+  const out = [];
+  if (b.pose !== "lie" && b.pose !== "lieAwake") out.push(box(cx - 95 * SCALE, py - 215 * SCALE, cx + 95 * SCALE, py + 35 * SCALE));
+  else out.push(box(cx - 260 * SCALE, py - 80 * SCALE, cx + 120 * SCALE, py + 40 * SCALE));
+  for (const pp of b.people ?? []) {
+    const ps = SCALE * (pp.s ?? 0.92), lib = POSE_LIB[pp.pose ?? "stand"], ppy = (pp.y ?? GROUND) - (lib.sitH ?? (lib.sit ? 58 : 130)) * ps;
+    const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
+    out.push(box(px - 95 * ps, ppy - 215 * ps, px + 95 * ps, ppy + 35 * ps));
+  }
+  for (const it of b.items ?? []) if ((it.type === "thought" || it.type === "say") && (it.delay ?? 0) <= lt) { const k = it.scale ?? 1.4; out.push(box(it.x - 170 * k, it.y - 80 * k, it.x + 170 * k, it.y + 80 * k)); }
+  return out;
+}
+const SPOTS = new Map();
+function captionSpot(b, ch) {
+  const key = b.idx + ":" + ch.s;
+  if (SPOTS.has(key)) return SPOTS.get(key);
+  const half = OW * 0.46, cands = [
+    { cx: OW / 2, y: CAP_Y, maxW: VERTICAL ? 960 : 1650 },
+    { cx: OW * 0.26, y: CAP_Y, maxW: half }, { cx: OW * 0.74, y: CAP_Y, maxW: half },
+  ];
+  if (!b.card && !b.quiz) cands.push({ cx: OW / 2, y: VERTICAL ? 300 : 175, maxW: VERTICAL ? 960 : 1500, top: true });
+  const times = [ch.s, (ch.s + ch.e) / 2, ch.e].map((x) => Math.min(b.dur - 0.01, Math.max(0, x)));
+  const obs = times.flatMap((x) => obstacles(b, x));
+  let best = null;
+  for (const [ci, c] of cands.entries()) {
+    const h = VERTICAL ? 110 : 92, rect = [c.cx - c.maxW / 2, c.y - h * 0.85, c.cx + c.maxW / 2, c.y + h * 0.3];
+    let cover = 0;
+    for (const o of obs) { const w = Math.min(rect[2], o[2]) - Math.max(rect[0], o[0]), hh = Math.min(rect[3], o[3]) - Math.max(rect[1], o[1]); if (w > 0 && hh > 0) cover += w * hh; }
+    const score = cover + ci * 400; // prefer the bottom-centre strip when it's clear
+    if (!best || score < best.score) best = { ...c, score };
+  }
+  SPOTS.set(key, best);
+  return best;
+}
 function frameSVG(t) {
   let i = BEATS.findIndex((b) => t < b.start + b.dur); if (i < 0) i = BEATS.length - 1;
   const b = BEATS[i], lt = t - b.start;
@@ -420,13 +508,16 @@ function frameSVG(t) {
     pose.armR = { ...pose.armR, a2: pose.armR.a2 + Math.sin(ph * 4.2 + 2) * 10 };
   }
   if (b.look) pose.headTilt += Math.sin(ph * 0.45) * 16;
-  if (anim === "run") {
-    const w = Math.sin(ph * 2.6);
-    pose.legL = { ...pose.legL, a1: -6 + 40 * w, a2: -6 + 40 * w - Math.max(0, -w) * 55 };
-    pose.legR = { ...pose.legR, a1: 6 - 40 * w, a2: 6 - 40 * w - Math.max(0, w) * 55 };
-    pose.armL = { ...pose.armL, a1: -20 - 45 * w, a2: 60 - 30 * w };
-    pose.armR = { ...pose.armR, a1: 20 + 45 * w, a2: -60 + 30 * w };
-    pose.lift += Math.abs(Math.cos(ph * 2.6)) * 16;
+  if (anim === "run" || anim === "walk") {
+    // distance-driven gait; blends back to standing as we arrive
+    const run = anim === "run", wd = b.walkDur ?? b.dur;
+    let dist, dirn = 1, m = 1;
+    if (b.walk) {
+      const [xa] = placement(b, 0), [xb] = placement(b, lt);
+      dist = Math.abs(xb - xa) / SCALE; dirn = b.walk[1] >= b.walk[0] ? 1 : -1;
+      m = Math.min(1, Math.max(0, (wd - lt) / 0.3), lt / 0.15 + 0.2);
+    } else dist = ltc * (run ? 260 : 130);
+    gait(pose, dist, dirn, m, run);
   }
   if (anim === "dance") {
     const w = Math.sin(ph * 2.2), w2 = Math.sin(ph * 1.1);
@@ -442,14 +533,7 @@ function frameSVG(t) {
     pose.legR = { ...pose.legR, a1: pose.legR.a1 + w * 10 };
   }
 
-  if (anim === "walk") {
-    const w = Math.sin(ph * 1.7);
-    pose.legL = { ...pose.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 };
-    pose.legR = { ...pose.legR, a1: 4 - 26 * w, a2: 4 - 26 * w - Math.max(0, w) * 30 };
-    pose.armL = { ...pose.armL, a1: -12 - 22 * w, a2: -6 - 30 * w };
-    pose.armR = { ...pose.armR, a1: 12 + 22 * w, a2: 6 + 30 * w };
-    pose.lift += Math.abs(Math.cos(ph * 1.7)) * 6;
-  }
+  applyAct(pose, b.act, lt);
   const blinking = !NO_BLINK.has(pose.expr) && ((tc + i * 0.7) % 3.4) < 0.13;
   if (blinking) pose.expr = "blink";
   // lip flaps while the narrator speaks
@@ -495,23 +579,74 @@ function frameSVG(t) {
     const pph = (tc + pi * 0.37) * 2 * Math.PI, pa = pp.anim ?? POSE_LIB[pp.pose ?? "stand"].anim;
 
     if (pa === "walk" || pp.walk) {
-      const w = Math.sin(pph * 1.7);
-      q.legL = { ...q.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 }; q.legR = { ...q.legR, a1: 4 - 26 * w, a2: 4 - 26 * w - Math.max(0, w) * 30 };
-      q.armL = { ...q.armL, a1: -12 - 22 * w, a2: -6 - 30 * w }; q.armR = { ...q.armR, a1: 12 + 22 * w, a2: 6 + 30 * w };
-      q.lift += Math.abs(Math.cos(pph * 1.7)) * 6;
+      const pps = SCALE * (pp.s ?? 0.92), d = pp.walk ? Math.abs(pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) / pps : (ltc + pi) * 120;
+      const goDir = pp.walk ? Math.sign(pp.walk[1] - pp.walk[0]) || 1 : 1;
+      gait(q, d, goDir * (pp.flip ? -1 : 1));
     }
     if (pa === "dance") {
       const w = Math.sin(pph * 2.2 + pi), w2 = Math.sin(pph * 1.1 + pi);
       q.lean += w2 * 10; q.lift += Math.abs(w) * 14;
       q.armL = { ...q.armL, a1: -150 + 50 * w, a2: -170 + 40 * w }; q.armR = { ...q.armR, a1: 150 - 50 * w, a2: 170 - 40 * w };
     }
-    if (pa === "talk") { q.armR = { ...q.armR, a1: 60 + Math.sin(pph * 1.3) * 25, a2: 30 + Math.sin(pph * 1.9) * 30 }; q.mouth = Math.sin(pph * 3) > 0.2 ? 1 : 0; }
-    if (pp.anim === "wave") q.armR = { ...q.armR, a1: 150, a2: 175 + Math.sin(pph * 1.8) * 22 };
+    const on = (from, to) => (pp.animFrom ?? 0) <= lt && lt < (pp.animTo ?? 1e9);
+    const cyc = (period, off = 0) => (((ltc + pi * 0.9 + off) % period) + period) % period; // seconds into a repeating action
+    const pulse = (c, a, d) => Math.sin(Math.PI * Math.min(1, Math.max(0, (c - a) / d))); // 0 -> 1 -> 0 over [a, a+d]
+    if (pa === "dance2" && on()) { // two-step with fists at the chest
+      const w = Math.sin(pph * 1.9 + pi); q.lean += w * 6; q.lift += Math.abs(Math.sin(pph * 3.8)) * 8;
+      q.armL = { target: [-30 + w * 8, -70], bend: -1, fist: true }; q.armR = { target: [30 + w * 8, -70], bend: 1, fist: true };
+      q.legL = { a1: -12 + w * 8, a2: -6 }; q.legR = { a1: 12 + w * 8, a2: 6 };
+    }
+    if (pa === "dance3" && on()) { // sway and clap overhead
+      const w = Math.sin(pph * 1.1 + pi), c = Math.abs(Math.sin(pph * 2.2)); q.lean += w * 7;
+      q.armL = { target: [-14 - c * 22, -176], bend: -1 }; q.armR = { target: [14 + c * 22, -176], bend: 1 };
+    }
+    if (pa === "dance4" && on()) { // disco point: up-right, down-left
+      const up = Math.sin(pph * 1.0 + pi) > 0; q.lean += up ? 6 : -6; q.lift += Math.abs(Math.sin(pph * 2)) * 6;
+      q.armR = up ? { target: [62, -170], bend: 1 } : { target: [30, -20], bend: 1 }; q.armL = { target: [-30, -60], bend: -1, fist: true };
+    }
+    if (pa === "talk" && on()) { // small hand gestures + nods (not arm-waving)
+      const c = Math.sin(pph * 0.7);
+      q.armR = { target: [40 + c * 8, -52 + Math.max(0, Math.sin(pph * 1.3)) * -14], bend: 1 }; q.headTilt += Math.sin(pph * 1.6) * 4; q.mouth = Math.sin(pph * 3) > 0.2 ? 1 : 0;
+    }
+    if (pa === "wave" && on()) q.armR = { ...q.armR, a1: 150, a2: 175 + Math.sin(pph * 1.8) * 22 };
+    if (pa === "strap" && on()) { // holding a subway strap, swaying with the car
+      q.armR = { target: [22, -172], bend: 1 }; q.lean += Math.sin(tc * 2.3) * 3; q.headTilt += Math.sin(tc * 2.3 + 0.6) * 2;
+    }
+    if (pa === "bob" && on()) { q.headTilt += Math.sin(tc * 2 * Math.PI * 1.6) * 6; q.lift += Math.abs(Math.sin(tc * 2 * Math.PI * 1.6)) * 2; q.armR = { target: [22, -172], bend: 1 }; }
+    if (pa === "watch" && on()) { // checks the time, impatient foot tap
+      const c = cyc(3.2); q.armL = { target: [-6, -66], bend: -1 }; q.headTilt += 10 * pulse(c, 0.2, 1.6); q.legR = { ...q.legR, a1: (q.legR.a1 ?? 10) + 5 * Math.max(0, Math.sin(tc * 14)) * (c > 1.8 ? 1 : 0) };
+    }
+    if (pa === "scroll" && on()) { // phone held at the chest, thumb flicks
+      q.armR = { target: [20, -66], bend: 1 }; q.holdR = "phone"; q.armL = { target: [6 + Math.max(0, Math.sin(tc * 5)) * 6, -62], bend: -1 }; q.headTilt += 8;
+    }
+    if ((pa === "sip" || pa === "icecream") && on()) { // food/drink to the mouth every few seconds
+      const c = cyc(3.6), up = pulse(c, 1.4, 1.1); q.holdR = pa === "sip" ? (pp.hold ?? "coffee") : "icecream";
+      q.armR = { target: [30 - 18 * up, -52 - 80 * up], bend: 1 }; q.headTilt += -4 * up;
+    }
+    if (pa === "wipe" && on()) { // wiping the counter in slow circles
+      const w = tc * 2.4; q.holdR = "cloth"; q.armR = { target: [44 + Math.cos(w) * 22, -34 + Math.sin(w) * 6], bend: 1 }; q.lean += 6 + Math.cos(w) * 2; q.headTilt += 8;
+    }
+    if (pa === "write" && on()) { // clipboard + pen scribbles
+      q.holdL = "clipboard"; q.armL = { target: [-14, -70], bend: -1 }; q.holdR = "pen";
+      q.armR = { target: [-4 + Math.sin(tc * 9) * 5, -76 + Math.sin(tc * 13) * 3], bend: 1 }; q.headTilt += 10;
+    }
+    if (pa === "newspaper" && on()) { q.holdR = "newspaper"; q.armR = { target: [20, -72], bend: 1 }; q.armL = { target: [-22, -70], bend: -1 }; q.headTilt += 6 + Math.sin(tc * 0.8) * 2; }
+    if ((pa === "read" || pp.pose === "read") && on()) { // turns a page every ~4 s
+      const c = cyc(4.2), f = pulse(c, 3.3, 0.6); q.armR = { target: [36 - 52 * f, -50 - 22 * f], bend: -1 };
+    }
+    if (pa === "pray" && on()) { q.armL = { target: [-6, -96], bend: -1 }; q.armR = { target: [6, -96], bend: 1 }; q.headTilt += Math.sin(tc * 1.4) * 5; q.lift += Math.abs(Math.sin(tc * 3)) * 2; }
+    if (pp.dog) q.armR = { target: [44, -22], bend: 1 };
+    applyAct(q, pp.act, lt);
     if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
     const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sitH ?? (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130)) * ps;
     const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
     world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
     world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
+    if (pp.dog) { // a dog trotting ahead on a leash from the walker's hand
+      const fs = pp.flip ? -1 : 1, hx = px + fs * ps * 44, hy = ppy + ps * (-22 - (q.lift ?? 0)), dx = px + fs * ps * 120, dy = pp.y ?? GROUND;
+      world += `<path d="M${hx.toFixed(1)},${hy.toFixed(1)} Q${((hx + dx) / 2).toFixed(1)},${(Math.max(hy, dy - 60) + 40).toFixed(1)} ${(dx + fs * 26).toFixed(1)},${(dy - 80).toFixed(1)}" fill="none" stroke="#e5584f" stroke-width="4"/>`;
+      world += `<g transform="translate(${dx.toFixed(1)},${dy}) scale(${ps * 0.75})">${PROPS.dog([0, 0], { t: tc, walk: !!pp.walk, dir: fs })}</g>`;
+    }
   }
   const layerOf = (it) => it.type === "thought" || it.type === "say" ? "bubble" : it.fg ? "fg" : "back";
   const drawItems = (layer) => { let out = ""; for (const it of b.items ?? []) {
@@ -540,6 +675,24 @@ function frameSVG(t) {
     const hx = cx + (b.pose === "think" ? 115 : 92) * (SCALE / 1.85), hy = py - (pose.lift ?? 0) * SCALE - 300 * (SCALE / 1.85) + Math.sin(t * 3) * 6;
     world += `<g opacity="${fade.toFixed(3)}" transform="translate(${hx.toFixed(1)},${hy.toFixed(1)}) scale(${(1.5 * sp).toFixed(3)})">${PROPS.emote([0, 0], { kind: emoteKind })}</g>`;
   }
+  // motion graphics on the action: speed lines behind a runner, sound waves closing in on covered ears
+  if (POSE_LIB[b.pose].anim === "run" && b.walk && lt < (b.walkDur ?? b.dur) - 0.2) {
+    const d = Math.sign(b.walk[1] - b.walk[0]) || 1;
+    for (let j = 0; j < 7; j++) { const yy = py - (40 + j * 34) * SCALE * 0.6, ph2 = ((tc * 3.2 + j * 0.37) % 1), len = 120 + (j % 3) * 60;
+      const x0 = cx - d * (90 + ph2 * 260); world += `<path d="M${x0.toFixed(1)},${yy.toFixed(1)} l${(-d * len).toFixed(1)},0" stroke="#fff" stroke-width="${7 - (j % 3) * 2}" stroke-linecap="round" opacity="${(0.75 * (1 - ph2)).toFixed(2)}"/>`; }
+  }
+  if (b.pose === "coverEars") {
+    const hx = cx, hy = py - 150 * SCALE;
+    for (let j = 0; j < 4; j++) { const ph2 = 1 - ((tc * 0.9 + j / 4) % 1), r = 120 + ph2 * 420;
+      world += `<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="#ffd84d" stroke-width="${(3 + (1 - ph2) * 6).toFixed(1)}" stroke-dasharray="26 18" opacity="${(0.5 * (1 - ph2) + 0.05).toFixed(2)}"/>`; }
+  }
+  // contact bursts (high-fives, fist bumps, handoffs): a quick radial pop at the touch point
+  for (const k of [...(b.act ?? []), ...(b.people ?? []).flatMap((p) => p.act ?? [])]) if (k.burst) {
+    const u = (lt - (k.at + (k.dur ?? 0.45))) / 0.35;
+    if (u >= 0 && u < 1) { const e = EASE.expo.out(u), r0 = 20 + e * 70, r1 = 40 + e * 110, op = 1 - EASE.power2.in(u);
+      world += `<g opacity="${op.toFixed(3)}" transform="translate(${k.burst[0]},${k.burst[1]})">` + [...Array(10)].map((_, j) => { const a = j * 36 * Math.PI / 180; return `<path d="M${(Math.cos(a) * r0).toFixed(1)},${(Math.sin(a) * r0).toFixed(1)} L${(Math.cos(a) * r1).toFixed(1)},${(Math.sin(a) * r1).toFixed(1)}" stroke="${j % 2 ? "#ffd84d" : "#fff"}" stroke-width="${(9 * (1 - u) + 2).toFixed(1)}" stroke-linecap="round"/>`; }).join("") + `<circle r="${(r0 * 0.6).toFixed(1)}" fill="none" stroke="#fff" stroke-width="${(6 * (1 - u)).toFixed(1)}"/></g>`; }
+  }
+  if (b.crumbs && b.crumbs.at !== undefined && lt >= b.crumbs.at && lt < b.crumbs.at + 1.6) world += PROPS.crumbs([0, 0], { ...b.crumbs, p: Math.min(1, (lt - b.crumbs.at) / 0.9) });
   world += drawItems("fg"); // tables etc. in front of the characters
   world += sc.fg;
   world += drawItems("bubble"); // speech/thought bubbles always on top
@@ -588,15 +741,18 @@ function frameSVG(t) {
       lines.map((l, j) => { const q = seg(lt, 0.18 + stagger(j, lines.length, 0.07), 0.3, EASE.power3.out);
         return `<text x="0" y="${(-bh / 2 + 88 + j * 96 + (1 - q) * 26).toFixed(1)}" opacity="${q.toFixed(3)}" text-anchor="middle" font-size="76" fill="#000" style="${M}">${esc(l)}</text>`; }).join("") + `</g>`;
   }
-  // captions live in the strip below everyone's feet, over a soft dark band so they always read
-  if (b.chunks.length && lt < b.speech + 0.4) s += `<rect x="0" y="${CAP_Y - 110}" width="${OW}" height="${OH - CAP_Y + 110}" fill="url(#capBand)" opacity="${Math.min(1, lt / 0.25, (b.speech + 0.4 - lt) / 0.25).toFixed(3)}"/>`;
-  // kinetic captions: words rise in on their own cue (power3.out), the spoken word lights up
+  // kinetic captions: words rise in on their own cue (power3.out), the spoken word lights up.
+  // Each chunk is placed where it covers nobody: bottom strip, bottom-left/right, or the top.
   const ch = b.chunks.find((c, j) => lt >= c.s - 0.08 && lt < (b.chunks[j + 1]?.s ?? c.e + 0.35) - 0.08);
   if (ch) {
-    const maxW = VERTICAL ? 960 : 1650, base = VERTICAL ? 92 : 76;
+    const spot = captionSpot(b, ch);
+    const maxW = spot.maxW, base = VERTICAL ? 92 : 76;
     const raw = ch.words.reduce((n, w) => n + (WIDTH[w.w] ?? w.w.length * 70), 0) + SPACE * (ch.words.length - 1);
-    const fs = Math.min(base, (maxW / raw) * 100), k = fs / 100, cy = CAP_Y;
-    let x = OW / 2 - (raw * k) / 2;
+    const fs = Math.min(base, (maxW / raw) * 100), k = fs / 100, cy = spot.y;
+    const bandA = Math.min(1, (lt - ch.s + 0.08) / 0.2, 1);
+    if (spot.top) s += `<rect x="0" y="0" width="${OW}" height="${cy + 60}" fill="url(#capBandTop)" opacity="${bandA.toFixed(3)}"/>`;
+    else s += `<rect x="0" y="${cy - 110}" width="${OW}" height="${OH - cy + 110}" fill="url(#capBand)" opacity="${bandA.toFixed(3)}"/>`;
+    let x = spot.cx - (raw * k) / 2;
     for (const w of ch.words) {
       const ww = (WIDTH[w.w] ?? w.w.length * 70) * k, q = seg(lt, w.s - 0.07, 0.2, EASE.power3.out);
       const active = lt >= w.s - 0.02 && lt <= w.e + 0.06, sc = (0.86 + 0.14 * EASE.back.out(q)) * (active ? 1.06 : 1);
@@ -647,7 +803,7 @@ function frameSVG(t) {
     <filter id="lit-night"><feColorMatrix type="matrix" values="0.78 0 0 0 0.02  0 0.82 0 0 0.03  0 0 0.95 0 0.08  0 0 0 1 0"/></filter>
     <filter id="lit-sunset"><feColorMatrix type="matrix" values="1 0 0 0 0.04  0 0.9 0 0 0.02  0 0 0.8 0 0  0 0 0 1 0"/></filter>
     <filter id="lit-party"><feColorMatrix type="matrix" values="0.95 0 0 0 0.015  0 0.9 0 0 0  0 0 0.98 0 0.03  0 0 0 1 0"/></filter>
-    <linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.32"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient>
+    <linearGradient id="capBandTop" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#000" stop-opacity="0.42"/></linearGradient><linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.32"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient>
     <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient>
     </defs>${s}</svg>`;
 }

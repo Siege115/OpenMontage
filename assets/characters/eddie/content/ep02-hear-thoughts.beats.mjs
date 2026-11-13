@@ -19,7 +19,13 @@ const ON = (item, word) => ({ ...item, on: word });
 const SAM = { acc: "cap:#5b8fd9", expr: "happy" };
 const MIA = { acc: ["beanie:#a98bd6", "glasses"], expr: "calm" };
 const MOM = { acc: "bun", expr: "happy" };
-const BARISTA = { x: 1600, acc: "cap:#e5584f", expr: "happy", flip: true, anim: "talk" };
+const BARISTA = { x: 1430, s: 1, acc: "cap:#e5584f", expr: "happy", flip: true }; // stands behind the counter
+// acting keys (see applyAct in eddie-rig.mjs): { on: word, off: s, armR: [x, y] | "rest", holdR, dur, sfx, burst: [x, y] }
+const HAND_OFF = (word, item, sfx) => ({ // giver reaches, receiver reaches, item changes hands on the word
+  giver: [{ at: 0, holdR: item, armR: [24, -60], dur: 0.01 }, { on: word, off: -0.65, armR: [76, -66], dur: 0.5 }, { on: word, off: -0.02, holdR: null, dur: 0.01 }, { on: word, off: 0.12, armR: "rest", dur: 0.55 }],
+  taker: [{ on: word, off: -0.55, armR: [74, -66], dur: 0.45 }, { on: word, off: -0.02, holdR: item, dur: 0.01, sfx, sfxAt: 0 }, { on: word, off: 0.12, armR: [30, -62], dur: 0.55 }],
+});
+const CUP = HAND_OFF("amazing", "coffee", "foley-glass-touch");
 const studio = (tone) => ({ name: "studio", tone });
 
 export const BEATS = [
@@ -28,7 +34,7 @@ export const BEATS = [
     items: [ON(T("where are my socks?!", 1500, 260, 1.2, -1), "Thinking")], text: "Tomorrow morning, you wake up… and you hear a voice. It's your neighbor. Through the wall. Thinking." },
   { pose: "shocked", x: 1080, scene: { name: "bedroom", clock: "7:03" }, text: "You can hear everyone's thoughts." },
   { pose: "walk", walk: [200, 900], scene: { name: "street", day: true },
-    people: [{ x: 1300, ...SAM, anim: "wave", flip: true }, { walk: [1900, 1500], acc: "pigtails", anim: "walk", flip: true }],
+    people: [{ x: 1300, ...SAM, anim: "wave", animTo: 2.4, flip: true }, { walk: [1900, 1500], acc: "pigtails", anim: "walk", flip: true, dog: true }],
     items: [ON(T("is it Friday yet?", 1640, 300, 1.6, -1), "secret"), ON(T("cute dog!", 1180, 150, 2.6, 1), "opinion")],
     text: "Not their voices. Their thoughts. Every secret. Every opinion. Every random little idea." },
   { pose: "celebrate", scene: studio("#fbefc4"), card: "NEVER LIED TO AGAIN", text: "It sounds like the ultimate superpower. You'd never be lied to again." },
@@ -36,25 +42,29 @@ export const BEATS = [
     text: "But by day thirty, you'll discover something about this power that changes everything. Let's find out." },
 
   // ================= DAY 1: the fun =================
-  { pose: "coffee", day: "DAY 1", x: 760, scene: { name: "cafe" }, people: [BARISTA, { x: 1180, acc: "beanie", expr: "neutral" }],
-    items: [ON(T("nice shirt.", 1600, 230, 1.0, -1), "Nice"), ON(T("please have cake…", 1180, 210, 3.2, 1), "praying")],
+  { pose: "stand", expr: "happy", day: "DAY 1", x: 1150, scene: { name: "cafe" }, people: [{ ...BARISTA, act: CUP.giver }, { x: 760, acc: "beanie", expr: "neutral", anim: "pray" }],
+    act: [...CUP.taker, { on: "praying", off: -0.3, armR: [16, -128], dur: 0.45, headTilt: -4 }, { on: "praying", off: 0.7, armR: [30, -62], dur: 0.5 }],
+    items: [ON(T("nice shirt.", 1450, 230, 1.0, -1), "Nice"), ON(T("please have cake…", 760, 210, 3.2, 1), "praying")],
     text: "Day one is amazing. The barista thinks, 'Nice shirt.' The guy behind you is praying they have cake." },
   { pose: "phone", x: 960, scene: { name: "subway", ad: "NEXT STOP: DOWNTOWN", ad2: "MIND THE GAP" },
-    people: [{ x: 520, acc: "glasses", pose: "sitBench", expr: "focused" }, { x: 1360, acc: "pigtails", flip: true }, { x: 1500, pose: "sitBench", acc: "cap:#8fc49a", flip: true }],
+    people: [{ x: 520, acc: "glasses", pose: "sitBench", expr: "focused", anim: "newspaper" }, { x: 1360, acc: "pigtails", flip: true, anim: "bob", expr: "happy" }, { x: 1500, pose: "sitBench", acc: "cap:#8fc49a", flip: true, expr: "focused", act: [{ at: 0.2, headTilt: -12, dur: 0.6 }] }],
     items: [ON(T("did I lock the door?", 520, 300, 0.8, 1), "Locked"), ON(T("♪ dun dun dun ♪", 1360, 210, 2.0, -1), "Song"), ON(T("that guy has|a phone too", 1500, 330, 3.2, -1), "judging")],
     text: "On the subway, the whole car is a radio. Locked doors. Song lyrics. Someone judging your phone." },
-  { pose: "sitBench", x: 700, scene: { name: "office", board: ["INTERVIEW", "10:00 AM"] }, people: [{ x: 1300, acc: "glasses", expr: "focused", flip: true, anim: "talk" }],
+  { pose: "sitBench", x: 700, scene: { name: "office", board: ["INTERVIEW", "10:00 AM"] }, people: [{ x: 1300, acc: "glasses", expr: "focused", flip: true, anim: "write" }],
+    act: [{ on: "$end", off: -0.1, armR: [44, -132], fistR: true, dur: 0.35 }],
     items: [{ type: "chair", x: 700, y: 870, scale: 1.05 }, ON(T("I hope they say|'teamwork'…", 1300, 250, 0.9, -1), "answer"), ON(SAY("Teamwork!", 700, 240, 3.0, 1), "$end")], pause: 1.1,
     text: "At a job interview, you hear the answer they want before they even ask the question." },
-  { pose: "highFive", x: 820, scene: { name: "rooftop" }, people: [{ x: 1120, ...SAM, flip: true }],
-    items: [ON(SAY("YOU GOT THE JOB?!", 1120, 240, 0.6, -1), "job")], text: "You get the job. Day one, and you're already winning at life." },
+  { pose: "stand", expr: "happy", x: 800, scene: { name: "rooftop" },
+    people: [{ x: 1120, s: 1, ...SAM, flip: true, act: [{ on: "job", off: -0.9, armR: [40, -150], dur: 0.35, lean: 5 }, { on: "job", off: -0.25, armR: [86, -112], dur: 0.23 }, { on: "job", off: 0.3, armR: "rest", dur: 0.5, lean: 0 }] }],
+    act: [{ on: "job", off: -0.9, armR: [40, -150], dur: 0.35, lean: 5 }, { on: "job", off: -0.25, armR: [86, -112], dur: 0.23, sfx: "click-clap-firm", burst: [960, 422], lift: 8 }, { on: "job", off: 0.3, armR: "rest", dur: 0.5, lift: 0, lean: 0 }],
+    items: [ON(SAY("YOU GOT THE JOB?!", 1064, 220, 0.6, -1), "job")], text: "You get the job. Day one, and you're already winning at life." },
 
   // ================= DAY 3: too loud =================
   { pose: "phone", expr: "focused", day: "DAY 3", x: 960, scene: { name: "subway", ad: "YOUR BRAIN FILTERS VOICES", ad2: "…BUT NOT THOUGHTS" },
-    people: [{ x: 420, acc: "bun" }, { x: 640, acc: "cap:#e5584f" }, { x: 1280, acc: "glasses", flip: true }, { x: 1520, acc: "beanie", flip: true }],
+    people: [{ x: 420, acc: "bun", anim: "strap" }, { x: 640, acc: "cap:#e5584f", anim: "strap" }, { x: 1280, acc: "glasses", flip: true, anim: "scroll" }, { x: 1520, acc: "beanie", flip: true, anim: "watch" }],
     text: "By day three, rush hour hits. Normally, your brain filters noise. Scientists call it the cocktail party effect: you can tune out a room and hear one voice." },
   { pose: "coverEars", x: 960, scene: { name: "subway", ad: "YOUR BRAIN FILTERS VOICES", ad2: "…BUT NOT THOUGHTS" },
-    people: [{ x: 420, acc: "bun" }, { x: 640, acc: "cap:#e5584f" }, { x: 1280, acc: "glasses", flip: true }, { x: 1520, acc: "beanie", flip: true }],
+    people: [{ x: 420, acc: "bun", anim: "strap" }, { x: 640, acc: "cap:#e5584f", anim: "strap" }, { x: 1280, acc: "glasses", flip: true, anim: "scroll" }, { x: 1520, acc: "beanie", flip: true, anim: "watch" }],
     items: [T("milk, eggs, bread", 420, 230, 0.2, 1), T("rent is due…", 640, 120, 0.6, 1), T("so tired", 1280, 230, 1.0, -1), T("I'm late!!", 1520, 120, 1.4, -1),
       T("is that guy ok?", 960, 90, 1.8, -1, 0.9), T("what's that smell", 230, 110, 2.2, 1, 0.9)],
     text: "But thoughts have no volume knob. Fifty minds, all talking at once." },
@@ -64,15 +74,17 @@ export const BEATS = [
     text: "Six thousand! Researchers estimate it's over six thousand distinct thoughts a day. And you're hearing all of them." },
   { pose: "run", walk: [180, 1150], scene: { name: "park" }, text: "You run. Somewhere. Anywhere quiet." },
   { pose: "sitBench", x: 1150, settle: 1.4, scene: { name: "park" }, cam: { from: [960, 540], to: [920, 560], z0: 1.0, z1: 1.04 },
+    act: [{ at: 0, holdR: "bread", armR: [30, -60], dur: 0.01 }, { on: "ducks", off: -1.0, armR: [62, -24], dur: 0.35 }, { on: "ducks", off: -0.6, armR: [-40, -112], dur: 0.22 }, { on: "ducks", off: 0.2, armR: [30, -60], dur: 0.6 }],
+    crumbs: { on: "ducks", off: -0.4, from: [1076, 533], to: [450, 930] },
     items: [{ type: "duck", x: 330, y: 945, scale: 1.7, quackOn: "ducks", arg: {} }, ON({ type: "thought", arg: { pic: "bread", tail: -1 }, x: 470, y: 700, scale: 1.4 }, "ducks")],
     text: "The park helps. Turns out, ducks don't think in words." },
 
   // ================= DAY 7: the party =================
   { pose: "stand", expr: "scared", day: "DAY 7", x: 960, scene: { name: "party" },
-    people: [{ x: 320, ...SAM, anim: "dance" }, { x: 620, acc: "pigtails", anim: "dance" }, { x: 1280, acc: "glasses", anim: "dance", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
+    people: [{ x: 320, ...SAM, anim: "dance2" }, { x: 620, acc: "pigtails", anim: "dance3" }, { x: 1280, acc: "glasses", anim: "dance4", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
     text: "A week in, Sam drags you to a party. You're terrified. Everyone's going to judge your dancing." },
   { pose: "dance", x: 960, scene: { name: "party" }, cam: { from: [520, 430], to: [1400, 430], z0: 1.3, z1: 1.3 },
-    people: [{ x: 320, ...SAM, anim: "dance" }, { x: 620, acc: "pigtails", anim: "dance" }, { x: 1280, acc: "glasses", anim: "dance", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
+    people: [{ x: 320, ...SAM, anim: "dance2" }, { x: 620, acc: "pigtails", anim: "dance3" }, { x: 1280, acc: "glasses", anim: "dance4", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
     items: [T("do I look dumb?", 320, 230, 0.6, 1), T("is my hair ok?", 620, 230, 1.6, 1), T("everyone's|watching me", 1280, 220, 2.6, -1), T("hope nobody|noticed my shoes", 1620, 120, 3.6, -1)],
     text: "But nobody's watching you. They're all thinking about themselves." },
   { pose: "crossArms", expr: "thinking", scene: studio("#f9dcd6"), quiz: { q: "HOW MANY NOTICED?", options: ["~75%", "~50%", "~25%"], answer: 2, on: ["most", "half", "quarter"] }, pause: 3.2,
@@ -82,11 +94,11 @@ export const BEATS = [
   { pose: "think", x: 960, scene: studio("#d9ecf7"), card: "MINDS WANDER ~47% OF THE TIME",
     text: "And people spend nearly half their waking hours with their minds wandering somewhere else entirely." },
   { pose: "dance", expr: "happy", x: 960, scene: { name: "party" },
-    people: [{ x: 320, ...SAM, anim: "dance" }, { x: 620, acc: "pigtails", anim: "dance" }, { x: 1280, acc: "glasses", anim: "dance", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
+    people: [{ x: 320, ...SAM, anim: "dance2" }, { x: 620, acc: "pigtails", anim: "dance3" }, { x: 1280, acc: "glasses", anim: "dance4", flip: true }, { x: 1620, acc: "bun", anim: "dance", flip: true }],
     text: "So for the first time in your life… you dance like nobody's watching. Because nobody is." },
 
   // ================= DAY 10: the temptation =================
-  { pose: "sitCards", expr: "focused", day: "DAY 10", x: 760, scene: { name: "living", night: true }, people: [{ x: 1260, ...SAM, pose: "sitCards", expr: "focused", flip: true }],
+  { pose: "sitCards", expr: "focused", day: "DAY 10", x: 760, scene: { name: "living", night: true }, people: [{ x: 1260, ...SAM, pose: "sitCards", expr: "focused", flip: true, act: [{ at: 0.15, armL: [74, -44], dur: 0.35 }, { at: 0.6, armL: "rest", dur: 0.4 }, { at: 0.75, armL: [70, -40], dur: 0.3 }, { at: 1.15, armL: "rest", dur: 0.4 }] }],
     items: [{ type: "pokerTable", x: 1010, y: 760, scale: 1, fg: true, arg: { w: 640 } }, ON(T("I have nothing.|Bluff it.", 1300, 260, 1.0, -1), "bluffing")],
     text: "Day ten. Poker night with Sam. You can hear exactly when he's bluffing." },
   { pose: "sitCheer", x: 760, scene: { name: "living", night: true }, people: [{ x: 1260, ...SAM, pose: "sitFacepalm", expr: "strain", flip: true }],
@@ -101,11 +113,13 @@ export const BEATS = [
     text: "You weren't playing with your best friend. You were reading him. And it doesn't feel like winning." },
 
   // ================= DAY 14: unfiltered =================
-  { pose: "giveGift", day: "DAY 14", x: 760, scene: { name: "living" }, people: [{ x: 1300, ...MOM, flip: true }],
+  { pose: "giveGift", day: "DAY 14", x: 760, scene: { name: "living" },
+    act: [{ at: 0, armR: [74, -60], dur: 0.01 }, { on: "loves", off: -0.42, holdR: null, dur: 0.01 }, { on: "loves", off: -0.3, armR: [28, 4], dur: 0.5 }],
+    people: [{ x: 1060, s: 1, ...MOM, flip: true, act: [{ on: "loves", off: -0.9, armR: [80, -60], dur: 0.45 }, { on: "loves", off: -0.42, holdR: "gift", dur: 0.01, sfx: "foley-paper-slide", sfxAt: 0 }, { on: "loves", off: -0.3, armR: [30, -150], dur: 0.5 }, { on: "head", off: -0.4, armR: [22, -58], dur: 0.5, expr: "neutral" }] }],
     items: [ON(SAY("I love it!", 1120, 280, 1.2, 1), "loves"), ON(T("where am I going|to put this?", 1530, 200, 2.6, -1, 0.9), "head")],
     text: "Two weeks in, the unfiltered truth arrives. Your mom loves your gift. Out loud. In her head? Not so much." },
   { pose: "shrug", x: 960, scene: { name: "street", day: true },
-    people: [{ x: 420, acc: "beanie" }, { x: 1520, acc: "cap:#e5584f", flip: true }],
+    people: [{ x: 420, acc: "beanie", anim: "watch" }, { x: 1520, acc: "cap:#e5584f", flip: true, anim: "icecream" }],
     items: [ON(T("what if I yelled|right now?", 420, 210, 0.8, 1), "random"), ON(T("what if I licked|that pole?", 1520, 210, 2.2, -1), "out")],
     text: "And then there's the weird stuff. The random, out-of-nowhere thoughts that pop into every head." },
   { pose: "explain", x: 1300, scene: { name: "office", board: ["INTRUSIVE THOUGHTS", "~94% of people", "13 countries"] },
@@ -128,9 +142,9 @@ export const BEATS = [
   { pose: "idea", expr: "calm", x: 960, scene: { name: "park" }, text: "For the first time in weeks, you can hear your own thoughts again." },
 
   // ================= DAY 30: the twist =================
-  { pose: "stand", expr: "thinking", day: "DAY 30", x: 800, scene: { name: "rooftop" }, people: [{ x: 1160, ...MIA, flip: true }],
+  { pose: "stand", expr: "thinking", day: "DAY 30", x: 800, scene: { name: "rooftop" }, people: [{ x: 1160, ...MIA, flip: true, anim: "sip", hold: "soda" }],
     text: "Day thirty. Sunset. You finally ask yourself the obvious question." },
-  { pose: "think", x: 800, scene: { name: "rooftop" }, people: [{ x: 1160, ...MIA, flip: true }],
+  { pose: "think", x: 800, scene: { name: "rooftop" }, people: [{ x: 1160, ...MIA, flip: true, anim: "sip", hold: "soda" }],
     items: [ON(T("why is her mind|so quiet?", 800, 150, 1.0, 1), "Why")], text: "Why is Mia's mind the only one you can't hear?" },
   { pose: "shocked", x: 800, riser: 1.2, scene: { name: "rooftop" }, people: [{ x: 1160, ...MIA, expr: "happy", flip: true }],
     cam: { from: [980, 450], to: [1160, 330], z0: 1.2, z1: 1.9 }, items: [ON(T("because I'm listening|too, Eddie.", 1160, 200, 1.2, -1), "Directly")],
@@ -149,14 +163,15 @@ export const BEATS = [
   // ================= THE ANSWER =================
   { pose: "crossArms", expr: "calm", day: "-", x: 960, scene: studio("#d9ecf7"),
     text: "So, what if you could hear everyone's thoughts? You'd win every game, and ace every interview." },
-  { pose: "stand", expr: "calm", x: 960, scene: { name: "street", day: true }, people: [{ x: 1350, ...SAM, flip: true, anim: "talk" }],
+  { pose: "stand", expr: "calm", x: 900, scene: { name: "street", day: true }, people: [{ x: 1220, s: 1, ...SAM, flip: true, anim: "talk", animTo: 4.5, act: [{ on: "doubt", off: -0.6, armR: [84, -64], fistR: true, dur: 0.32 }, { on: "doubt", off: 0.3, armR: "rest", dur: 0.5 }] }],
+    act: [{ on: "doubt", off: -0.6, armR: [84, -64], fistR: true, dur: 0.32, sfx: "impact-light-soft", burst: [1060, 511] }, { on: "doubt", off: 0.3, armR: "rest", dur: 0.5 }],
     text: "But the real superpower isn't reading minds. It's giving people the benefit of the doubt, because now you know how messy it is in there." },
 
   // ================= OUTRO + mini twist =================
-  { pose: "coffee", x: 760, scene: { name: "cafe" }, people: [BARISTA], items: [ON(T("nice shirt.", 1600, 230, 0.6, -1), "barista")], pause: 0.9,
+  { pose: "coffee", x: 900, scene: { name: "cafe" }, people: [{ ...BARISTA, anim: "wipe" }], items: [ON(T("nice shirt.", 1450, 230, 0.6, -1), "barista")], pause: 0.9,
     text: "Next morning. Same café. Same barista." },
-  { pose: "shocked", x: 760, scene: { name: "cafe" }, people: [{ ...BARISTA, anim: undefined, expr: "focused" }],
-    cam: { from: [1200, 450], to: [1600, 340], z0: 1.2, z1: 2.0 }, items: [ON(T("…wait. Can HE hear me?", 1600, 230, 0.8, -1), "$end")], pause: 2.0,
+  { pose: "shocked", x: 900, scene: { name: "cafe" }, people: [{ ...BARISTA, expr: "focused", act: [{ at: 0, holdR: "cloth", armR: [50, -36], dur: 0.01 }] }],
+    cam: { from: [1150, 450], to: [1430, 340], z0: 1.2, z1: 2.0 }, items: [ON(T("…wait. Can HE hear me?", 1450, 230, 0.8, -1), "$end")], pause: 2.0,
     text: "And then you hear her think something new." },
   { pose: "wave", x: 960, scene: studio("#fbefc4"), text: "Would you want this power? Tell me in the comments. And who do you think the barista is?" },
   { pose: "idea", scene: studio("#e3f2df"), card: "NEXT: NEVER FEEL PAIN", text: "Next time, Eddie finds out what happens if you never feel pain again. Subscribe, so you don't miss it." },

@@ -1,3 +1,4 @@
+import { EASE } from "./motion.mjs";
 // Eddie — a bald, black-and-white stickman mascot as a poseable SVG rig.
 //
 // Pure vector, no AI model, no API key: every pose is a function of a small
@@ -246,6 +247,28 @@ export function head(expr = "neutral", mouth = 0, acc = null) {
 const BUBBLE_DEFS = `<defs><linearGradient id="bubbleShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf1"/></linearGradient></defs>`;
 const chipStack = (x, y, n, col) => { let g = ""; for (let i = 0; i < n; i++) g += `<ellipse cx="${x}" cy="${y - i * 7}" rx="21" ry="8" fill="${col}" stroke="${P.ink}" stroke-width="2.4"/><path d="M${x - 10},${y - i * 7} L${x - 6},${y - i * 7} M${x + 6},${y - i * 7} L${x + 10},${y - i * 7}" stroke="#fff" stroke-width="2.4"/>`; return g; };
 export const PROPS = {
+  // small dog in side view, trotting when arg.walk (legs cycle with arg.t), tail wag
+  dog: (o, a = {}) => {
+    const t = a.t ?? 0, w = a.walk ? Math.sin(t * 14) : 0, wag = Math.sin(t * 16) * 18, d = a.dir ?? 1;
+    const legs = [[-26, w], [-14, -w], [20, -w], [32, w]].map(([x, k]) => `<path d="M${x},6 L${x + k * 8},34" stroke="${P.ink}" stroke-width="7" stroke-linecap="round"/>`).join("");
+    return `<g transform="translate(${o[0]},${o[1] - 36 - Math.abs(w) * 3}) scale(${d},1)">${legs}
+      <g transform="rotate(${-30 + wag},-38,-4)"><path d="M-38,-4 Q-56,-20 -50,-36" fill="none" stroke="${P.ink}" stroke-width="7" stroke-linecap="round"/></g>
+      <ellipse cx="0" cy="0" rx="44" ry="20" fill="#e2b679" stroke="${P.ink}" stroke-width="4"/><ellipse cx="-6" cy="4" rx="20" ry="9" fill="#f4dcb4"/>
+      <g transform="translate(46,-18) rotate(${Math.sin(t * 3) * 4})"><ellipse cx="0" cy="0" rx="22" ry="19" fill="#e2b679" stroke="${P.ink}" stroke-width="4"/><path d="M-8,-12 Q-22,-10 -18,14 Q-6,6 -4,-6 Z" fill="#a8763f" stroke="${P.ink}" stroke-width="3"/>
+        <ellipse cx="22" cy="4" rx="9" ry="7" fill="#f4dcb4" stroke="${P.ink}" stroke-width="3"/><circle cx="29" cy="1" r="4" fill="${P.ink}"/><circle cx="8" cy="-4" r="3.5" fill="${P.ink}"/><path d="M18,12 q6,6 10,0" fill="#e5584f" stroke="${P.ink}" stroke-width="2"/></g>
+      <path d="M30,-10 l10,10" stroke="#e5584f" stroke-width="6" stroke-linecap="round"/></g>`;
+  },
+  // breadcrumbs tossed in an arc: arg.p 0..1 flight progress
+  crumbs: (o, a = {}) => {
+    const [x0, y0] = a.from, [x1, y1] = a.to, p = a.p ?? 0;
+    let g = "";
+    for (let i = 0; i < 8; i++) {
+      const q = Math.min(1, Math.max(0, p * 1.15 - i * 0.03)), sp = (i - 3.5) * 16;
+      const x = x0 + (x1 + sp - x0) * q, y = y0 + (y1 - y0) * q - Math.sin(Math.PI * q) * 220;
+      g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${9 + (i % 3) * 2}" fill="#e2b679" stroke="${P.ink}" stroke-width="3"/>`;
+    }
+    return g;
+  },
   pokerTable: (o, a = {}) => {
     const w = a.w ?? 680, win = a.wins ?? 0, k = win % 1, n = Math.floor(win);
     // pot: chips in the middle slide toward Eddie (left) with each win
@@ -452,6 +475,13 @@ export function character(pose) {
 
 // Objects held in a hand (drawn centred on the hand, on top of it).
 const HELD = {
+  icecream: `<path d="M-9,-16 L9,-16 L0,10 Z" fill="#e2b679" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><path d="M-6,-10 L4,-2 M-2,-16 L6,-8" stroke="#b8894f" stroke-width="2"/><circle cx="0" cy="-24" r="11" fill="#f29ac0" stroke="${P.ink}" stroke-width="3"/><circle cx="-4" cy="-28" r="3" fill="#fff" opacity=".7"/>`,
+  cloth: `<path d="M-14,-6 Q-4,-14 12,-8 L14,8 Q2,14 -12,8 Z" fill="#9cc3e6" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><path d="M-8,-2 L8,2" stroke="#7aa6d0" stroke-width="2"/>`,
+  clipboard: `<rect x="-16" y="-34" width="32" height="42" rx="3" fill="#c99b72" stroke="${P.ink}" stroke-width="3"/><rect x="-11" y="-28" width="22" height="32" fill="#fff"/><rect x="-6" y="-38" width="12" height="7" rx="2" fill="#9aa0ad" stroke="${P.ink}" stroke-width="2"/><path d="M-7,-20 l14,0 M-7,-13 l10,0 M-7,-6 l14,0" stroke="${P.ink}" stroke-width="1.6" opacity=".6"/>`,
+  pen: `<path d="M-2,4 L2,-20" stroke="#5b8fd9" stroke-width="4" stroke-linecap="round"/><path d="M-2,4 L-3,8" stroke="${P.ink}" stroke-width="2"/>`,
+  soda: `<rect x="-9" y="-26" width="18" height="30" rx="4" fill="#e5584f" stroke="${P.ink}" stroke-width="3"/><path d="M-9,-14 L9,-14" stroke="#fff" stroke-width="3"/><ellipse cx="0" cy="-26" rx="8" ry="2.5" fill="#cfd3da" stroke="${P.ink}" stroke-width="2"/>`,
+  bread: `<path d="M-14,-4 Q-14,-18 0,-18 Q14,-18 14,-4 L14,6 L-14,6 Z" fill="#e2b679" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><path d="M-6,-12 l4,4 M2,-14 l4,4" stroke="#b8894f" stroke-width="2"/>`,
+  newspaper: `<rect x="-26" y="-40" width="52" height="40" fill="#f4f1ea" stroke="${P.ink}" stroke-width="3"/><path d="M-20,-32 l40,0" stroke="${P.ink}" stroke-width="4"/><path d="M-20,-22 l18,0 M-20,-16 l18,0 M-20,-10 l18,0 M4,-22 l16,0 M4,-16 l16,0 M4,-10 l16,0" stroke="${P.ink}" stroke-width="1.6" opacity=".5"/>`,
   cards: [-22, -6, 10].map((r, i) => `<g transform="rotate(${r})"><rect x="-11" y="-42" width="24" height="34" rx="3" fill="#fff" stroke="${P.ink}" stroke-width="2.6"/><rect x="-7" y="-38" width="16" height="26" rx="2" fill="${i === 1 ? "#e5584f" : "#5b8fd9"}" opacity=".85"/><path d="M1,-31 L4,-25 L1,-19 L-2,-25 Z" fill="#fff"/></g>`).join(""),
   phone: `<rect x="-9" y="-30" width="20" height="36" rx="4" fill="#2b2f3a" stroke="${P.ink}" stroke-width="3"/><rect x="-6" y="-26" width="14" height="24" rx="2" fill="#9cd0ff"/>`,
   coffee: `<path d="M-11,-22 L11,-22 L8,4 L-8,4 Z" fill="#fff" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><rect x="-13" y="-27" width="26" height="6" rx="2" fill="#c98a5f" stroke="${P.ink}" stroke-width="3"/><rect x="-10" y="-14" width="20" height="8" fill="#c98a5f"/>`,
@@ -654,3 +684,66 @@ export const POSES = {
     props: [{ type: "laptop", at: [0, -6] }],
   },
 };
+
+// Gait (MOTION.md §walk): the phase comes from distance travelled, so each planted foot stays put
+// on the ground while the body passes over it (no sliding). Stance: the foot tracks backwards at
+// ground level; swing: it arcs forward with a lift and toe-off. Hips are lowest on contact,
+// highest on passing; arms counter-swing the legs; both shoes point the way we're going.
+// dist: rig units travelled; dir: +1 facing/going right in local space; m: 0..1 blend from rest.
+const STAND_FEET = [[-14.5, 117], [14.5, 117]];
+export function gait(q, dist, dir, m = 1, run = false) {
+  const Ls = run ? 40 : 31, lift = run ? 32 : 18, duty = run ? 0.38 : 0.55, cycle = 4 * Ls * (run ? 0.75 : 1);
+  const p = ((dist / cycle) % 1 + 1) % 1;
+  const foot = (ph) => {
+    ph = ((ph % 1) + 1) % 1;
+    if (ph < duty) { const u = ph / duty; return { x: Ls * (1 - 2 * u), y: 114, rot: 0, u: -1 }; } // planted, moving back
+    const u = (ph - duty) / (1 - duty), e = EASE.sine.inOut(u);
+    return { x: Ls * (-1 + 2 * e), y: 114 - lift * Math.sin(Math.PI * u), rot: (u < 0.5 ? -22 * Math.sin(Math.PI * u * 2) : 10 * Math.sin(Math.PI * (u - 0.5) * 2)), u }; // toe-off, then toes up for the heel strike
+  };
+  const fL = foot(p), fR = foot(p + 0.5);
+  const leg = (f, rest, side) => {
+    const x = rest[0] + (dir * f.x - rest[0]) * m, y = rest[1] + (f.y - rest[1]) * m;
+    return { target: [x, y], bend: -dir, shoeSide: m > 0.5 ? dir : side, shoeRot: dir * f.rot * m };
+  };
+  q.legL = leg(fL, STAND_FEET[0], -1); q.legR = leg(fR, STAND_FEET[1], 1);
+  const sw = (f) => (f.u < 0 ? -f.x / Ls : Math.cos(Math.PI * f.u)) ; // +1 = foot behind
+  const aL = sw(fL), aR = sw(fR), amp = run ? 40 : 24;
+  q.armL = { a1: -8 + dir * amp * aL * m, a2: -8 + dir * (amp * aL + (run ? 60 : 14)) * m };
+  q.armR = { a1: 8 + dir * amp * aR * m, a2: 8 + dir * (amp * aR + (run ? 60 : 14)) * m };
+  q.lift = (q.lift ?? 0) + m * (run ? 10 * Math.abs(Math.sin(2 * Math.PI * p)) : 4 * Math.sin(2 * Math.PI * p) ** 2);
+  q.lean = (q.lean ?? 0) + m * dir * (run ? 9 : 3);
+  return q;
+}
+
+// Keyframed acting: hands move between targets with an eased, slightly anticipated motion;
+// held objects switch on their key (that's how things get handed over).
+// keys: [{ at, dur = 0.45, armR / armL: [x, y] | "rest", bendR/bendL, holdR / holdL: id | null, fistR/fistL, headTilt, lean, expr }]
+const handOf = (spec, side) => {
+  if (!spec) return side === "R" ? [26, 10] : [-26, 10];
+  if (spec.target) return spec.target;
+  const S0 = [0, -78], e = [S0[0] + Math.sin(spec.a1 * Math.PI / 180) * 50, S0[1] + Math.cos(spec.a1 * Math.PI / 180) * 50];
+  return [e[0] + Math.sin(spec.a2 * Math.PI / 180) * 46, e[1] + Math.cos(spec.a2 * Math.PI / 180) * 46];
+};
+export function applyAct(q, keys, lt) {
+  if (!keys?.length) return q;
+  for (const side of ["R", "L"]) {
+    const arm = "arm" + side, base = q[arm], rest = handOf(base, side);
+    let cur = rest, bend = base?.bend ?? (side === "R" ? 1 : -1), fist = base?.fist;
+    for (const k of keys) {
+      if (k[arm] === undefined || k.at > lt) continue;
+      const to = k[arm] === "rest" ? rest : k[arm], u = Math.min(1, (lt - k.at) / (k.dur ?? 0.45));
+      const e = u < 1 ? (u < 0.5 ? 4 * u ** 3 : 1 - (-2 * u + 2) ** 3 / 2) : 1; // easeInOutCubic
+      cur = [cur[0] + (to[0] - cur[0]) * e, cur[1] + (to[1] - cur[1]) * e];
+      if (k["bend" + side] !== undefined) bend = k["bend" + side];
+      if (k["fist" + side] !== undefined) fist = k["fist" + side];
+    }
+    if (cur !== rest) q[arm] = { target: cur, bend, fist, thumb: base?.thumb };
+    for (const k of keys) if (k.at <= lt && k["hold" + side] !== undefined) q["hold" + side] = k["hold" + side];
+  }
+  for (const k of keys) if (k.at <= lt) { if (k.expr) q.expr = k.expr; }
+  for (const f of ["headTilt", "lean", "lift"]) {
+    let v = null; for (const k of keys) if (k.at <= lt && k[f] !== undefined) { const u = Math.min(1, (lt - k.at) / (k.dur ?? 0.45)); v = (v ?? 0) + (k[f] - (v ?? 0)) * (1 - (1 - u) ** 3); }
+    if (v !== null) q[f] = (q[f] ?? 0) + v;
+  }
+  return q;
+}

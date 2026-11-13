@@ -285,20 +285,23 @@ export const SCENES = {
     // back shelf with cups and coffee bags behind the counter
     bg += wallShelf(1300, 470, 520, [["mug", 30], ["mug", 80], ["mug", 130], ["jar", 200], ["jar", 250], ["plant", 330], ["books", 380, 4, 2, 60]], t);
     // counter with espresso machine, pastry case and register (right)
-    bg += `<rect x="1300" y="620" width="560" height="250" fill="#8a5a3c" ${o(6)}/>${[1340, 1480, 1620, 1760].map((x) => `<rect x="${x}" y="650" width="100" height="190" rx="6" fill="none" stroke="#6f4630" stroke-width="5"/>`).join("")}<rect x="1280" y="600" width="600" height="30" rx="6" fill="#c99b72" ${o(5)}/>
-      <rect x="1520" y="470" width="190" height="130" rx="14" fill="#b9bcc6" ${o(5)}/><rect x="1555" y="500" width="120" height="40" rx="6" fill="#2b2f3a" ${o(3)}/><path d="M1580,600 L1580,560 M1650,600 L1650,560" ${o(5)}/>
-      <rect x="1360" y="555" width="60" height="45" rx="6" fill="#fff" ${o(4)}/>
-      <path d="M1730,600 L1730,520 Q1730,500 1750,500 L1850,500 Q1870,500 1870,520 L1870,600 Z" fill="#dff1fa" opacity=".85" ${o(4)}/><circle cx="1770" cy="580" r="16" fill="#f0b27a" ${o(2.5)}/><circle cx="1810" cy="582" r="14" fill="#e9767a" ${o(2.5)}/><path d="M1830,592 l30,0 l-6,-18 l-18,0 z" fill="#f7d774" ${o(2.5)}/>`;
+    // back counter (behind the barista) with the espresso machine and register
+    bg += `<rect x="1300" y="560" width="560" height="40" fill="#7a4f34" ${o(4)}/><rect x="1520" y="430" width="190" height="130" rx="14" fill="#b9bcc6" ${o(5)}/><rect x="1555" y="460" width="120" height="40" rx="6" fill="#2b2f3a" ${o(3)}/><path d="M1580,560 L1580,520 M1650,560 L1650,520" ${o(5)}/>
+      <rect x="1760" y="500" width="80" height="60" rx="6" fill="#4a4f5c" ${o(4)}/><rect x="1772" y="510" width="56" height="18" fill="#8fe39a"/>`;
+    // front counter + pastry case: drawn in FRONT of the barista
+    let fg = `<rect x="1300" y="620" width="560" height="250" fill="#8a5a3c" ${o(6)}/>${[1340, 1480, 1620, 1760].map((x) => `<rect x="${x}" y="650" width="100" height="190" rx="6" fill="none" stroke="#6f4630" stroke-width="5"/>`).join("")}<rect x="1280" y="600" width="600" height="30" rx="6" fill="#c99b72" ${o(5)}/>
+      <path d="M1730,600 L1730,520 Q1730,500 1750,500 L1850,500 Q1870,500 1870,520 L1870,600 Z" fill="#dff1fa" opacity=".85" ${o(4)}/><circle cx="1770" cy="580" r="16" fill="#f0b27a" ${o(2.5)}/><circle cx="1810" cy="582" r="14" fill="#e9767a" ${o(2.5)}/><path d="M1830,592 l30,0 l-6,-18 l-18,0 z" fill="#f7d774" ${o(2.5)}/>
+      <rect x="1600" y="572" width="44" height="28" rx="4" fill="#fff" ${o(3)}/><text x="1622" y="592" text-anchor="middle" font-size="14" fill="${INK}">TIPS</text>`;
     // table + chairs + cups (left)
     bg += `<path d="M230,870 L240,700 M230,760 L320,760 L330,870" fill="none" ${o(6)}/><path d="M610,870 L600,700 M610,760 L520,760 L510,870" fill="none" ${o(6)}/>`;
     bg += `<ellipse cx="420" cy="720" rx="190" ry="34" fill="#c99b72" ${o(5)}/><path d="M420,750 L420,860 M360,870 L480,870" ${o(7)}/>
       <rect x="370" y="676" width="44" height="40" rx="6" fill="#fff" ${o(4)}/><rect x="450" y="680" width="40" height="36" rx="6" fill="#f0b27a" ${o(4)}/><path d="M300,712 l40,-6 l6,10 z" fill="#f7d774" ${o(2.5)}/>`;
     bg += bigPlant(1000, FLOOR, 0.8, t, "#8fb3a0") + `<rect x="1150" y="770" width="60" height="100" rx="6" fill="#4a4f5c" ${o(4)}/><path d="M1160,790 l40,0" stroke="#e5584f" stroke-width="5"/>`;
-    for (const [i, cx0] of [[0, 392], [1, 470], [2, 1390]].entries()) for (let k = 0; k < 2; k++) {
-      const p = (t * 0.5 + k / 2 + i * 0.3) % 1, base = i === 2 ? 550 : 670;
+    for (const [i, cx0] of [[0, 392], [1, 470], [2, 1615]].entries()) for (let k = 0; k < 2; k++) {
+      const p = (t * 0.5 + k / 2 + i * 0.3) % 1, base = i === 2 ? 430 : 670;
       bg += `<path d="M${cx0 + Math.sin(t * 2 + k + i) * 6},${base - p * 70} q8,-12 0,-24 q-8,-12 0,-24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="${(1 - p) * 0.8}"/>`;
     }
-    return { bg, fg: "" };
+    return { bg, fg };
   },
 
   // ---------------------------------------------------------------- soft studio (for big-number cards)
@@ -317,11 +320,11 @@ export const SCENES = {
     // gallery wall + wall shelf
     bg += frameArt(400, 150, 170, 130, 0) + frameArt(600, 120, 120, 160, 1) + frameArt(400, 310, 120, 100, 3) + frameArt(545, 310, 175, 100, 2);
     bg += wallShelf(820, 300, 330, [["plant", 40], ["books", 90, 6, 4], ["frame", 260], ["mug", 305]], t);
-    bg += corkboard(1150, 470, 300, 190, t) + outlet(760, 800) + outlet(1260, 800);
+    bg += corkboard(1170, 380, 260, 180, t) + outlet(760, 800) + outlet(1260, 800);
     bg += pendant(700, 60, shade(tone, -0.35), "#ffd98a", t) + pendant(1240, 40, shade(tone, -0.35), "#ffd98a", t);
     // desk corner (right) with a laptop, mug and lamp; big plant
     bg += `<rect x="1480" y="690" width="400" height="26" rx="6" fill="#c99b72" ${o(4)}/><path d="M1510,716 L1510,${FLOOR} M1850,716 L1850,${FLOOR}" ${o(7)}/><rect x="1690" y="716" width="150" height="110" fill="#b98a63" ${o(4)}/><circle cx="1765" cy="770" r="5" fill="${INK}"/>`;
-    bg += `<path d="M1530,690 L1610,690 L1620,620 L1540,620 Z" fill="#4a4f5c" ${o(4)}/><path d="M1515,690 L1640,690" ${o(5)}/><rect x="1552" y="632" width="56" height="44" fill="#9cd0ff" opacity=".7"/>` + knick("mug", 1680, 690, t) +
+    bg += `<rect x="1536" y="606" width="104" height="74" rx="6" fill="#4a4f5c" ${o(4)}/><rect x="1546" y="616" width="84" height="54" rx="2" fill="#9cd0ff"/><path d="M1554,630 l40,0 M1554,642 l56,0 M1554,654 l30,0" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".8"/><path d="M1520,680 L1656,680 L1664,690 L1512,690 Z" fill="#6b7080" ${o(4)}/>` + knick("mug", 1690, 690, t) +
       `<path d="M1800,690 L1800,610 L1760,570" fill="none" ${o(5)}/><path d="M1735,580 L1790,555 L1798,585 Z" fill="#e9767a" ${o(4)}/>`;
     bg += bigPlant(1880, FLOOR, 0.9, t);
     bg += motes(380, 1500, 150, 820, t, 16);

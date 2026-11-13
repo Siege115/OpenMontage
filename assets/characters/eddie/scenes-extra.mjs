@@ -95,7 +95,10 @@ export const EXTRA_SCENES = {
     bg += `<rect x="740" y="100" width="440" height="100" rx="10" fill="#fff" ${o(4)}/><path d="M770,150 L1150,150" stroke="#e5584f" stroke-width="8"/>` + [...Array(7)].map((_, i) => `<circle cx="${780 + i * 60}" cy="150" r="${i === 3 ? 12 : 8}" fill="${i === 3 ? "#f7d774" : "#fff"}" ${o(3)}/><text x="${780 + i * 60}" y="${i % 2 ? 185 : 128}" text-anchor="middle" font-size="16" fill="${INK}" style="font-family:MBlack,sans-serif;font-weight:900">${["A", "B", "C", "D", "E", "F", "G"][i]}</text>`).join("");
     for (let x = 60; x < W; x += 360) bg += `<rect x="${x}" y="8" width="240" height="22" rx="8" fill="#fffbe6" opacity="${0.85 + 0.15 * Math.sin(t * 40 + x) * (Math.sin(t * 0.7 + x) > 0.97 ? 1 : 0)}" ${o(3)}/>`;
     bg += `<rect x="900" y="470" width="120" height="90" rx="6" fill="#d5dbe3" ${o(3)}/><rect x="918" y="488" width="84" height="54" fill="#e5584f"/><text x="960" y="525" text-anchor="middle" font-size="18" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">STOP</text>`;
-    bg += `<rect x="1180" y="480" width="190" height="66" rx="8" fill="#22202b" ${o(3)}/><text x="1275" y="526" text-anchor="middle" font-size="30" fill="#ff9a3c" style="font-family:MBlack,sans-serif;font-weight:900">${["NEXT: D", "MIND THE GAP", "NEXT: D"][Math.floor(t / 2.5) % 3]}</text>`;
+    // LED ticker: text scrolls left -> right, clipped to the screen
+    const msg = "NEXT STOP: D  •  MIND THE GAP  •", mw = msg.length * 15, span = 166 + mw, mx = 1192 - mw + ((t * 110) % span);
+    bg += `<defs><clipPath id="led"><rect x="1192" y="490" width="166" height="46" rx="4"/></clipPath></defs><rect x="1180" y="480" width="190" height="66" rx="8" fill="#22202b" ${o(3)}/><rect x="1192" y="490" width="166" height="46" rx="4" fill="#120f18"/>
+      <g clip-path="url(#led)"><text x="${mx.toFixed(1)}" y="522" font-size="24" fill="#ff9a3c" style="font-family:MBlack,sans-serif;font-weight:900">${msg}</text></g>`;
     bg += `<circle cx="1560" cy="510" r="22" fill="#f7d774" ${o(3)}/><path d="M1552,510 l8,-10 l8,10" fill="none" ${o(3)}/><rect x="560" y="490" width="70" height="44" rx="6" fill="#8fc49a" ${o(2.5)}/><path d="M572,512 q10,-12 22,0 q10,12 24,0" fill="none" stroke="#fff" stroke-width="4"/>`;
     return { bg, fg };
   },
@@ -130,11 +133,11 @@ export const EXTRA_SCENES = {
     // ceiling grid, poster, filing cabinet + printer, coat rack, sticky notes, desk lamp glow
     for (let x = 0; x < W; x += 160) bg += `<path d="M${x},0 L${x},60" stroke="#d3d9de" stroke-width="3"/>`;
     bg += `<path d="M0,60 L${W},60" stroke="#d3d9de" stroke-width="4"/>`;
-    bg += `<rect x="790" y="290" width="200" height="250" fill="#2f5fb3" ${o(4)}/><path d="M820,470 L860,410 L900,440 L960,360" fill="none" stroke="#f7d774" stroke-width="8"/><text x="890" y="335" text-anchor="middle" font-size="30" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">GOALS</text>`;
+    bg += `<rect x="800" y="290" width="170" height="150" fill="#2f5fb3" ${o(4)}/><circle cx="812" cy="300" r="5" fill="#e5584f"/><circle cx="958" cy="300" r="5" fill="#e5584f"/><path d="M825,420 L860,380 L895,400 L945,345" fill="none" stroke="#f7d774" stroke-width="7"/><path d="M932,345 l14,0 l0,14" fill="none" stroke="#f7d774" stroke-width="6"/><text x="885" y="330" text-anchor="middle" font-size="26" fill="#fff" style="font-family:MBlack,sans-serif;font-weight:900">GOALS</text>`;
     for (const [x, y, c, r] of [[660, 160, "#f7d774", -6], [690, 260, "#f29ac0", 4], [150, 430, "#9cc3e6", -3]]) bg += `<rect x="${x}" y="${y}" width="70" height="66" fill="${c}" ${o(2.5)} transform="rotate(${r},${x + 35},${y + 33})"/>`;
     bg += `<rect x="40" y="580" width="180" height="${FLOOR - 580}" fill="#9aa3ae" ${o(5)}/>${[660, 760].map((y) => `<path d="M40,${y} L220,${y}" ${o(4)}/><rect x="100" y="${y - 50}" width="60" height="12" rx="5" fill="${INK}"/>`).join("")}<rect x="60" y="520" width="140" height="60" rx="8" fill="#e3e8ee" ${o(4)}/><rect x="80" y="506" width="100" height="16" fill="#fff" ${o(2.5)}/><circle cx="180" cy="550" r="6" fill="#8fe39a"/>`;
     bg += `<path d="M1900,${FLOOR} L1900,520 M1870,${FLOOR} L1930,${FLOOR}" ${o(6)}/><path d="M1900,560 q-40,10 -50,70 l30,0 q4,-50 20,-70" fill="#c9a77f" ${o(3)}/>`;
-    bg += knick("mug", 1300, 592, t) + knick("plant", 1380, 592, t) + outlet(600, 810) + wallShelf(1080, 540, 300, [["books", 20, 7, 4], ["trophy", 200], ["clock", 260]], t);
+    bg += knick("mug", 1255, 592, t) + knick("plant", 1300, 592, t) + outlet(600, 810) + wallShelf(1655, 610, 210, [["books", 14, 5, 4], ["trophy", 140], ["clock", 186]], t);
     return { bg, fg: "" };
   },
 
