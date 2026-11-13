@@ -63,7 +63,8 @@ def main() -> None:
                     times[x + k] = (t0 + (t1 - t0) * (k - 1) / (gap - 1), t0 + (t1 - t0) * k / (gap - 1))
     json.dump([{"w": w, "s": round(t[0], 3), "e": round(t[1], 3)} for w, t in zip(script, times)], open(out, "w"))
     matched = len(anchors)
-    json.dump({"matched": matched, "total": len(script)}, open(out + ".meta.json", "w"))
+    unmatched = [i for i in range(len(script)) if i not in set(anchors)]
+    json.dump({"matched": matched, "total": len(script), "unmatched": unmatched}, open(out + ".meta.json", "w"))
     print(f"aligned {len(script)} words ({matched} matched)", file=sys.stderr)
 
 

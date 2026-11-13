@@ -244,7 +244,27 @@ export function head(expr = "neutral", mouth = 0, acc = null) {
 // ---------- props / fx (all black & white) ----------
 
 const BUBBLE_DEFS = `<defs><linearGradient id="bubbleShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf1"/></linearGradient></defs>`;
+const chipStack = (x, y, n, col) => { let g = ""; for (let i = 0; i < n; i++) g += `<ellipse cx="${x}" cy="${y - i * 7}" rx="21" ry="8" fill="${col}" stroke="${P.ink}" stroke-width="2.4"/><path d="M${x - 10},${y - i * 7} L${x - 6},${y - i * 7} M${x + 6},${y - i * 7} L${x + 10},${y - i * 7}" stroke="#fff" stroke-width="2.4"/>`; return g; };
 export const PROPS = {
+  pokerTable: (o, a = {}) => {
+    const w = a.w ?? 680, win = a.wins ?? 0, k = win % 1, n = Math.floor(win);
+    // pot: chips in the middle slide toward Eddie (left) with each win
+    const potX = -10 - 190 * (k > 0 ? k : 0), potN = n >= (a.rounds ?? 4) ? 0 : 5;
+    let g = `<g transform="translate(${o[0]},${o[1]})">
+      <path d="M${-w / 2 - 20},0 L${-w / 2 + 10},150 L${w / 2 - 10},150 L${w / 2 + 20},0 Z" fill="#8a5a3c" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M${-w / 2 + 30},150 L${-w / 2 + 40},180 M${w / 2 - 30},150 L${w / 2 - 40},180" stroke="${P.ink}" stroke-width="10" stroke-linecap="round"/>
+      <ellipse cx="0" cy="0" rx="${w / 2 + 26}" ry="58" fill="#7d5636" stroke="${P.ink}" stroke-width="5"/>
+      <ellipse cx="0" cy="-4" rx="${w / 2}" ry="44" fill="#2f8a5a" stroke="${P.ink}" stroke-width="3"/>
+      <ellipse cx="0" cy="-4" rx="${w / 2 - 40}" ry="30" fill="none" stroke="#5fb383" stroke-width="3" stroke-dasharray="10 8"/>`;
+    // community cards (face up)
+    [-70, -30, 10].forEach((x, i) => { g += `<g transform="translate(${x + 40},-14) rotate(${(i - 1) * 3})"><rect x="-14" y="-10" width="28" height="22" rx="3" fill="#fff" stroke="${P.ink}" stroke-width="2.4"/><text x="0" y="7" text-anchor="middle" font-size="15" fill="${i === 1 ? "#e5584f" : P.ink}" style="font-family:MBlack,sans-serif;font-weight:900">${["A", "K", "7"][i]}</text></g>`; });
+    // each player's own stacks + Eddie's winnings growing
+    g += chipStack(-w / 2 + 70, 18, 3 + n * 2, "#e5584f") + chipStack(-w / 2 + 110, 22, 2 + n, "#5b8fd9");
+    g += chipStack(w / 2 - 80, 18, Math.max(1, 5 - n), "#f7d774");
+    const potOp = k > 0.75 ? (1 - k) / 0.25 : 1; // pot fades into Eddie's pile as it lands
+    if (potN) g += `<g opacity="${potOp.toFixed(3)}">` + chipStack(potX, 20, potN, "#8fc49a") + chipStack(potX + 34, 24, potN - 2, "#e5584f") + `</g>`;
+    return g + `</g>`;
+  },
   chair: (o) => `<g transform="translate(${o[0]},${o[1]})">
     <rect x="-112" y="-340" width="150" height="190" rx="26" fill="#5b6475" stroke="${P.ink}" stroke-width="5"/><rect x="-94" y="-320" width="114" height="150" rx="18" fill="#6f7a8d"/>
     <rect x="-110" y="-142" width="230" height="34" rx="14" fill="#6f7a8d" stroke="${P.ink}" stroke-width="5"/>
@@ -432,6 +452,7 @@ export function character(pose) {
 
 // Objects held in a hand (drawn centred on the hand, on top of it).
 const HELD = {
+  cards: [-22, -6, 10].map((r, i) => `<g transform="rotate(${r})"><rect x="-11" y="-42" width="24" height="34" rx="3" fill="#fff" stroke="${P.ink}" stroke-width="2.6"/><rect x="-7" y="-38" width="16" height="26" rx="2" fill="${i === 1 ? "#e5584f" : "#5b8fd9"}" opacity=".85"/><path d="M1,-31 L4,-25 L1,-19 L-2,-25 Z" fill="#fff"/></g>`).join(""),
   phone: `<rect x="-9" y="-30" width="20" height="36" rx="4" fill="#2b2f3a" stroke="${P.ink}" stroke-width="3"/><rect x="-6" y="-26" width="14" height="24" rx="2" fill="#9cd0ff"/>`,
   coffee: `<path d="M-11,-22 L11,-22 L8,4 L-8,4 Z" fill="#fff" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><rect x="-13" y="-27" width="26" height="6" rx="2" fill="#c98a5f" stroke="${P.ink}" stroke-width="3"/><rect x="-10" y="-14" width="20" height="8" fill="#c98a5f"/>`,
   bag: `<path d="M-16,4 L16,4 L20,40 L-20,40 Z" fill="#e9a8a0" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/><path d="M-8,4 Q0,-10 8,4" fill="none" stroke="${P.ink}" stroke-width="3"/>`,
@@ -567,6 +588,22 @@ export const POSES = {
     props: [{ type: "zzz", at: [-180, -140] }],
   },
   walk: { label: "Walking", expr: "neutral", anim: "walk" },
+  // card game at a table (legs are hidden by the table, so they use the seated leg setup)
+  sitCards: {
+    label: "Cards", expr: "focused", sit: true, sitH: 72,
+    legL: { a1: 84, a2: 4, shoeSide: 1 }, legR: { a1: 93, a2: -3, shoeSide: 1 },
+    armL: { target: [-8, -40], bend: -1 }, armR: { target: [26, -48], bend: 1 }, holdR: "cards",
+  },
+  sitCheer: {
+    label: "Win!", expr: "happy", sit: true, sitH: 72,
+    legL: { a1: 84, a2: 4, shoeSide: 1 }, legR: { a1: 93, a2: -3, shoeSide: 1 },
+    armL: { target: [-74, -176], bend: 1, fist: true }, armR: { target: [74, -176], bend: -1, fist: true },
+  },
+  sitFacepalm: {
+    label: "Oops", expr: "strain", sit: true, sitH: 72, headTilt: 8,
+    legL: { a1: 84, a2: 4, shoeSide: 1 }, legR: { a1: 93, a2: -3, shoeSide: 1 },
+    overHead: { target: [14, -128], bend: 1, thumb: 200 }, armL: { target: [-10, -36], bend: -1 },
+  },
   run: { label: "Running", expr: "scared", anim: "run", lean: 14 },
   dance: { label: "Dancing", expr: "happy", anim: "dance" },
   coverEars: {

@@ -112,9 +112,12 @@ if (NARRATION) {
       if (!existsSync(clean)) sh("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af", VOICE_CHAIN, "-ar", "44100", "-ac", "1", clean]);
       const words = align(clean, b.text, h + "c");
       const meta = JSON.parse(readFileSync(join(outDir, "audio", `${h}c.words.json.meta.json`), "utf8"));
-      const score = meta.matched / Math.max(1, meta.total);
+      // strict QA: every real word must be heard; quiz answers must ALL be clearly spoken
+      const scriptWords = b.text.split(/\s+/), miss = (meta.unmatched ?? []).filter((k) => scriptWords[k] && scriptWords[k].replace(/[^a-z]/gi, "").length > 2);
+      const quizMiss = (b.quiz?.on ?? []).filter((tok) => !scriptWords.some((w, k) => w.toLowerCase().replace(/[^a-z0-9]/g, "").startsWith(tok) && !(meta.unmatched ?? []).includes(k)));
+      const score = meta.matched / Math.max(1, meta.total) - quizMiss.length * 0.5 - Math.max(0, miss.length - 1) * 0.1;
       if (!best || score > best.score) best = { h, clean, words, score };
-      if (score >= 0.86) break; // clean take: transcription matches the script
+      if (score >= 0.86 && quizMiss.length === 0 && miss.length <= 1) break; // clean take
       regenerated++;
     }
     const paddedG = join(outDir, "audio", `${best.h}.gap${gap}.wav`);
@@ -162,6 +165,8 @@ for (const b of BEATS) {
     b.quiz.countFrom = b.speech + 0.15; b.quiz.revealAt = b.dur - 0.45; // countdown runs in the silent pause, then the answer lights up
   }
   for (const it of b.items ?? []) if (it.type === "duck" && it.quackOn) { const w = wordAt(b, it.quackOn); if (w) it.quackAt = w.t; }
+  // card table: each word in winOn slides the pot to Eddie
+  for (const it of b.items ?? []) if (it.winOn) { let from = 0; it.winAt = it.winOn.map((tok) => { const w = wordAt(b, tok, from); if (w) { from = w.idx; return w.t; } return null; }).filter((x) => x !== null); }
 }
 
 // loudness envelope at character frame rate -> lip flaps
@@ -247,7 +252,11 @@ if (SFX_AVAILABLE) {
     if (act && BEATS[i - 1]?.pose !== b.pose) cue(act[0], t0 + act[1], -3);
     if (b.riser) cue("riser-2s-soft", t0 + b.riser);
     if (b.quiz) { b.quiz.at.forEach((a) => cue("pop-medium-in", t0 + a + 0.05, -2)); cue("time-countdown", t0 + b.quiz.countFrom, -4); cue("notification-success-chime", t0 + b.quiz.revealAt, -1); }
-    for (const it of b.items ?? []) if (it.type === "duck" && it.quackAt !== undefined) quacks.push(t0 + it.quackAt);                    // arrival at the reveal
+    for (const it of b.items ?? []) if (it.type === "duck" && it.quackAt !== undefined) quacks.push(t0 + it.quackAt);
+    for (const it of b.items ?? []) if (it.type === "pokerTable") {
+      cue("foley-card-slide", t0 + 0.25, -6); cue("foley-card-touch", t0 + 0.9, -8);
+      for (const w of it.winAt ?? []) { cue("money-coins-pour", t0 + w + 0.05, -7); cue("money-coin-stack", t0 + w + 0.45, -8); }
+    }                    // arrival at the reveal
   });
   const speech = BEATS.map((b) => [b.start, b.start + b.speech]);
   const placed = mixCues(mix, cues, speech, 10 ** (-2 / 20));
@@ -328,6 +337,8 @@ for (const [i, b] of BEATS.entries()) {
   const changed = i > 0 && sceneKey(BEATS[i - 1]) !== sceneKey(b);
   b.shots = [];
   if (b.cam) { b.shots.push({ type: b.cam.type ?? "custom", s: 0, e: b.dur, custom: b.cam }); continue; }
+  // walking/running shots: a locked, steady frame (no cuts, no zoom) so the motion reads cleanly
+  if (b.walk && !VERTICAL) { b.shots.push({ type: "custom", s: 0, e: b.dur, custom: { from: [W / 2, H / 2], to: [W / 2, H / 2], z0: 1, z1: 1 }, still: true }); continue; }
   for (let k = 0; k < n; k++) {
     let type = k === 0 && changed ? "wide" : pool[(b.idx * 2 + k * (b.idx % 2 ? 1 : 2)) % pool.length];
     if (k > 0 && type === b.shots[k - 1].type) type = pool[(pool.indexOf(type) + 1) % pool.length];
@@ -457,7 +468,7 @@ function frameSVG(t) {
   const shot = b.shots.find((s) => lt < s.e) ?? b.shots[b.shots.length - 1];
   const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0, shot.custom);
   // handheld drift: the camera is never perfectly still
-  cam.fx += Math.sin(t * 0.61) * 7 + Math.sin(t * 1.73) * 2.5; cam.fy += Math.cos(t * 0.47) * 5 + Math.sin(t * 1.31) * 2;
+  if (!shot.still) { cam.fx += Math.sin(t * 0.43) * 1.5; cam.fy += Math.cos(t * 0.37) * 1; } // barely-there drift
   // vertical: pan to whoever's thought just popped up (the bubbles are the story)
   const tItems = (b.items ?? []).filter((it) => (it.type === "thought" || it.type === "say") && it.delay !== undefined);
   if (VERTICAL && tItems.length) {
@@ -501,9 +512,9 @@ function frameSVG(t) {
     world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
     world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
   }
-  const isBubble = (it) => it.type === "thought" || it.type === "say";
-  const drawItems = (bubbles) => { let out = ""; for (const it of b.items ?? []) {
-    if (isBubble(it) !== bubbles) continue;
+  const layerOf = (it) => it.type === "thought" || it.type === "say" ? "bubble" : it.fg ? "fg" : "back";
+  const drawItems = (layer) => { let out = ""; for (const it of b.items ?? []) {
+    if (layerOf(it) !== layer) continue;
     if (it.delay && lt < it.delay) continue;
     let pop = 1, op = 1;
     if (it.delay !== undefined) {
@@ -512,10 +523,11 @@ function frameSVG(t) {
       pop *= 1 - 0.35 * out; op = 1 - out;
     }
     const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
-    const arg = it.type === "duck" ? { ...it.arg, t, quack: it.quackAt !== undefined && lt >= it.quackAt && lt < it.quackAt + 0.22 } : it.arg;
+    let arg = it.type === "duck" ? { ...it.arg, t, quack: it.quackAt !== undefined && lt >= it.quackAt && lt < it.quackAt + 0.22 } : it.arg;
+    if (it.winAt) arg = { ...arg, wins: (arg?.wins ?? 0) + it.winAt.reduce((acc, w) => acc + EASE.power3.out(Math.min(1, Math.max(0, (lt - w) / 0.55))), 0) };
     out += `<g opacity="${op.toFixed(3)}" transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], arg)}</g>`;
   } return out; };
-  world += drawItems(false);
+  world += drawItems("back");
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
   const footY = POSE_LIB[b.pose].sit ? py : GROUND;
   world += `<g filter="${lightF}"><g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g></g>`;
@@ -527,8 +539,9 @@ function frameSVG(t) {
     const hx = cx + (b.pose === "think" ? 115 : 92) * (SCALE / 1.85), hy = py - (pose.lift ?? 0) * SCALE - 300 * (SCALE / 1.85) + Math.sin(t * 3) * 6;
     world += `<g opacity="${fade.toFixed(3)}" transform="translate(${hx.toFixed(1)},${hy.toFixed(1)}) scale(${(1.5 * sp).toFixed(3)})">${PROPS.emote([0, 0], { kind: emoteKind })}</g>`;
   }
+  world += drawItems("fg"); // tables etc. in front of the characters
   world += sc.fg;
-  world += drawItems(true); // speech/thought bubbles always on top
+  world += drawItems("bubble"); // speech/thought bubbles always on top
   if (b.blanket) world += `<path d="M330,640 Q520,600 700,650 L700,800 Q480,820 300,800 Z" fill="#7fa7d9" stroke="${ink}" stroke-width="5" stroke-linejoin="round"/><path d="M340,680 Q520,650 690,690" fill="none" stroke="#6a92c6" stroke-width="5"/>`;
   // screen shake on impacts (first ~6 frames)
   const shakeOn = ["shocked", "scared", "panic"].includes(b.pose) && lt < 0.22;
