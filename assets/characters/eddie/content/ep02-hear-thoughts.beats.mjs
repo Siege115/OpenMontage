@@ -172,7 +172,7 @@ export const BEATS = [
     text: "Next morning. Same café. Same barista." },
   { pose: "shocked", x: 900, scene: { name: "cafe" }, people: [{ ...BARISTA, expr: "focused", act: [{ at: 0, holdR: "cloth", armR: [50, -36], dur: 0.01 }] }],
     cam: { from: [1150, 450], to: [1430, 340], z0: 1.2, z1: 2.0 }, items: [ON(T("…wait. Can HE hear me?", 1450, 230, 0.8, -1), "$end")], pause: 2.0,
-    text: "And then you hear her think something new." },
+    text: "And then you hear him think something new." },
   { pose: "wave", x: 960, scene: studio("#fbefc4"), text: "Would you want this power? Tell me in the comments. And who do you think the barista is?" },
   { pose: "idea", scene: studio("#e3f2df"), card: "NEXT: NEVER FEEL PAIN", text: "Next time, Eddie finds out what happens if you never feel pain again. Subscribe, so you don't miss it." },
 ];

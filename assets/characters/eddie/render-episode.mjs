@@ -550,8 +550,68 @@ function frameSVG(t) {
 
   // world layers
   const sc = b.scene ? SCENES[b.scene.name](b.scene, tc) : SCENES.studio({}, tc);
+  // ---- bubble layout (world space, before the camera): each visible bubble is placed where it covers no face and
+  // no other bubble, as close to its authored spot as possible, with room for its tail to reach the speaker's head
+  const BL = new Map();
+  {
+    const heads = [{ k: "eddie", x: cx, y: py - (pose.lift ?? 0) * SCALE - 204 * SCALE, r: 62 * SCALE }];
+    for (const [pi, pp] of (b.people ?? []).entries()) {
+      const ps = SCALE * (pp.s ?? 0.92), lib = POSE_LIB[pp.pose ?? "stand"], ppy = (pp.y ?? GROUND) - (lib.sitH ?? (lib.sit ? 58 : 130)) * ps;
+      heads.push({ k: pi, x: pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x, y: ppy - 204 * ps, r: 62 * ps });
+    }
+    const placed = [], TOP = 128;
+    for (const it of b.items ?? []) {
+      if (!(it.type === "thought" || it.type === "say") || it.who === "none") continue;
+      if (it.delay !== undefined && lt < it.delay) continue;
+      if (it.life && lt > it.delay + it.life + 0.2) continue;
+      const aim = Array.isArray(it.who) ? { x: it.who[0], y: it.who[1] } : it.who !== undefined ? heads.find((h) => h.k === it.who) : heads.slice().sort((p1, p2) => Math.abs(p1.x - it.x) - Math.abs(p2.x - it.x))[0];
+      if (!aim) continue;
+      const parts = it.arg?.pic ? ["      "] : String(it.arg?.t ?? "").split("|"), longest = Math.max(...parts.map((l) => l.length)), S0 = it.scale ?? 1.4;
+      const bw = (it.type === "say" ? longest * 20 + 64 : longest * 19 + 80) * S0, bh = (it.type === "say" ? parts.length * 46 + 38 : parts.length * 44 + 52) * S0;
+      const gap = it.type === "say" ? 62 : 80, side = Math.sign(it.x - aim.x) || (aim.x < W / 2 ? 1 : -1);
+      const cands = [
+        [it.x, Math.min(it.y, aim.y - gap - bh / 2)],                                   // authored spot, lifted clear of the head
+        [aim.x + side * bw * 0.25, aim.y - gap - bh / 2],                              // straight above
+        [aim.x + side * (bw / 2 + 50), aim.y - gap * 0.6 - bh / 2],                     // up and to the side
+        [aim.x - side * (bw / 2 + 50), aim.y - gap * 0.6 - bh / 2],
+        [aim.x + side * (bw / 2 + 120), aim.y + 30],                                    // beside the head
+        [aim.x - side * (bw / 2 + 120), aim.y + 30],
+        [aim.x + side * bw * 0.2, aim.y - gap - bh / 2, 66],                             // higher up (the camera eases out to fit)
+      ];
+      let best = null;
+      for (const [k, [x0, y0, top0]] of cands.entries()) {
+        const x = Math.min(W - bw / 2 - 10, Math.max(bw / 2 + 10, x0)), y = Math.max((top0 ?? TOP) + bh / 2, y0);
+        let cost = k * 40 + Math.hypot(x - it.x, y - it.y) * 0.15 + (top0 ? 150 : 0);
+        for (const h of heads) if (h !== aim && Math.abs(h.x - x) < bw / 2 + 20 && h.y > y && Math.abs(h.x - x) < Math.abs(aim.x - x)) cost += 1500; // reads as someone else's
+        for (const h of heads) { // never over a face
+          const dx = Math.max(Math.abs(h.x - x) - bw / 2, 0), dy = Math.max(Math.abs(h.y + h.r - y) - bh / 2, 0);
+          if (Math.hypot(dx, dy) < h.r + 6) cost += 5000;
+        }
+        for (const r of placed) { const ox = Math.min(x + bw / 2, r.x + r.w / 2) - Math.max(x - bw / 2, r.x - r.w / 2), oy = Math.min(y + bh / 2, r.y + r.h / 2) - Math.max(y - bh / 2, r.y - r.h / 2); if (ox > 0 && oy > 0) cost += 3000 + ox * oy * 0.05; }
+        if (aim.y - (y + bh / 2) < 20 && Math.abs(aim.x - x) < bw / 2) cost += 800; // tail would be buried
+        if (!best || cost < best.cost) best = { x, y, cost };
+      }
+      placed.push({ x: best.x, y: best.y, w: bw, h: bh });
+      BL.set(it, { x: best.x, y: best.y, w: bw, h: bh, aim });
+    }
+  }
   const shot = b.shots.find((s) => lt < s.e) ?? b.shots[b.shots.length - 1];
   const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0, shot.custom);
+  // keep every visible bubble fully in frame (under the HUD): pan, and if that's not enough, ease the zoom out
+  if (BL.size) {
+    for (let pass = 0; pass < 2; pass++) {
+      let vw = OW / cam.s, vh = OH / cam.s, top = cam.fy - vh / 2, left = cam.fx - vw / 2;
+      const m = 125 / cam.s, mx = 20 / cam.s;
+      const bx0 = Math.min(...[...BL.values()].map((r) => r.x - r.w / 2)), bx1 = Math.max(...[...BL.values()].map((r) => r.x + r.w / 2)), by0 = Math.min(...[...BL.values()].map((r) => r.y - r.h / 2));
+      const needW = bx1 - bx0 + 2 * mx, needTop = by0 - m;
+      const faceBottom = Math.max(...[...BL.values()].map((r) => r.aim.y + 125 * SCALE)) + 30;
+      if (needW > vw || faceBottom - needTop > vh) { cam.s = Math.max(BASE, Math.min(cam.s, OW / needW, OH / (faceBottom - needTop))); vw = OW / cam.s; vh = OH / cam.s; }
+      if (needTop < cam.fy - vh / 2) cam.fy = needTop + vh / 2;
+      if (bx0 - mx < cam.fx - vw / 2) cam.fx = bx0 - mx + vw / 2;
+      if (bx1 + mx > cam.fx + vw / 2) cam.fx = bx1 + mx - vw / 2;
+      cam.fx = Math.min(W - vw / 2, Math.max(vw / 2, cam.fx)); cam.fy = Math.min(H - vh / 2, Math.max(vh / 2, cam.fy));
+    }
+  }
   // handheld drift: the camera is never perfectly still
   if (!shot.still) { cam.fx += Math.sin(t * 0.43) * 1.5; cam.fy += Math.cos(t * 0.37) * 1; } // barely-there drift
   // vertical: pan to whoever's thought just popped up (the bubbles are the story)
@@ -665,7 +725,6 @@ function frameSVG(t) {
     }
   }
   const layerOf = (it) => it.type === "thought" || it.type === "say" ? "bubble" : it.fg ? "fg" : "back";
-  const placedB = [];
   const drawItems = (layer) => { let out = ""; for (const it of b.items ?? []) {
     if (layerOf(it) !== layer) continue;
     if (it.delay && lt < it.delay) continue;
@@ -677,38 +736,8 @@ function frameSVG(t) {
       pop *= 1 - 0.35 * out; op = 1 - out;
     }
     const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
-    // aim the bubble's tail at whoever is thinking / talking (it.who: "eddie" | person index | [x, y]; inferred if absent)
-    const bub = it.type === "thought" || it.type === "say";
-    let aim = null;
-    if (bub && it.who !== "none") {
-      const heads = [{ k: "eddie", x: cx, y: py - (pose.lift ?? 0) * SCALE - (POSE_LIB[b.pose].sit ? 204 : 204) * SCALE }];
-      for (const [pi, pp] of (b.people ?? []).entries()) {
-        const ps = SCALE * (pp.s ?? 0.92), lib = POSE_LIB[pp.pose ?? "stand"], ppy = (pp.y ?? GROUND) - (lib.sitH ?? (lib.sit ? 58 : 130)) * ps;
-        heads.push({ k: pi, x: pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x, y: ppy - 204 * ps });
-      }
-      if (Array.isArray(it.who)) aim = { x: it.who[0], y: it.who[1] };
-      else if (it.who !== undefined) aim = heads.find((h) => h.k === it.who);
-      else aim = heads.slice().sort((p1, p2) => Math.abs(p1.x - it.x) - Math.abs(p2.x - it.x))[0];
-    }
-    const sc0 = (it.scale ?? 1.4) * pop;
-    // keep a visible gap between bubble and head so the tail / dots always show
-    let ix = it.x, iy = it.y;
-    if (aim && bub) {
-      const ln = it.arg?.pic ? 1 : String(it.arg?.t ?? "").split("|").length, longest = it.arg?.pic ? 6 : Math.max(...String(it.arg?.t ?? "").split("|").map((l) => l.length));
-      const S0 = it.scale ?? 1.4, bw = (it.type === "say" ? longest * 20 + 64 : longest * 19 + 80) * S0, bh = (it.type === "say" ? ln * 46 + 38 : ln * 44 + 52) * S0;
-      const need = it.type === "say" ? 62 : 80, gap = aim.y - (iy + bh / 2), TOP = 128; // stay under the HUD
-      if (gap < need) iy -= need - gap;
-      if (iy - bh / 2 < TOP) { iy = TOP + bh / 2; if (aim.y - (iy + bh / 2) < need * 0.6) { // no room above: sit beside the head instead
-        ix = aim.x + (Math.sign(it.x - aim.x) || (aim.x < W / 2 ? 1 : -1)) * (bw / 2 + 120); iy = Math.max(TOP + bh / 2, aim.y + 10);
-      } }
-      // don't sit on top of a bubble that's already up: slide sideways
-      for (const r of placedB) {
-        const ox = Math.min(ix + bw / 2, r.x + r.w / 2) - Math.max(ix - bw / 2, r.x - r.w / 2), oy = Math.min(iy + bh / 2, r.y + r.h / 2) - Math.max(iy - bh / 2, r.y - r.h / 2);
-        if (ox > 0 && oy > 0) ix += (ix >= r.x ? 1 : -1) * (ox + 16);
-      }
-      ix = Math.min(W - bw / 2 - 10, Math.max(bw / 2 + 10, ix));
-      placedB.push({ x: ix, y: iy, w: bw, h: bh });
-    }
+    const sc0 = (it.scale ?? 1.4) * pop, L = BL.get(it);
+    const aim = L?.aim ?? null, ix = L?.x ?? it.x, iy = L?.y ?? it.y;
     let arg = it.type === "duck" ? { ...it.arg, t, quack: it.quackAt !== undefined && lt >= it.quackAt && lt < it.quackAt + 0.22 } : it.arg;
     if (it.winAt) arg = { ...arg, wins: (arg?.wins ?? 0) + it.winAt.reduce((acc, w) => acc + EASE.power3.out(Math.min(1, Math.max(0, (lt - w) / 0.55))), 0) };
     if (aim) arg = { ...arg, to: [(aim.x - ix) / sc0, (aim.y - 14 - (iy + fl)) / sc0] };
