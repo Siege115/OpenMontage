@@ -147,6 +147,23 @@ for (const b of BEATS) {
   b.chunks = chunks.map((c) => ({ text: c.map((x) => x.w).join(" "), words: c, s: c[0].s, e: c[c.length - 1].e }));
 }
 
+// ---- word cues: bubbles / quiz options appear on the exact narration word ----
+const norm = (w) => w.toLowerCase().replace(/[^a-z0-9']/g, "");
+function wordAt(b, token, from = 0) {
+  if (token === "$end") return { t: b.speech + 0.1, idx: b.words.length };
+  const tk = norm(token);
+  for (let k = from; k < b.words.length; k++) if (norm(b.words[k].w).startsWith(tk)) return { t: b.words[k].s, idx: k + 1 };
+  return null;
+}
+for (const b of BEATS) {
+  for (const it of b.items ?? []) if (it.on) { const w = wordAt(b, it.on); if (w) it.delay = Math.max(0, w.t - 0.12); }
+  if (b.quiz) {
+    let from = 0; b.quiz.at = b.quiz.options.map((_, j) => { const w = b.quiz.on?.[j] && wordAt(b, b.quiz.on[j], from); if (w) { from = w.idx; return Math.max(0, w.t - 0.1); } return 0.9 + j * 0.7; });
+    b.quiz.countFrom = b.speech + 0.15; b.quiz.revealAt = b.dur - 0.45; // countdown runs in the silent pause, then the answer lights up
+  }
+  for (const it of b.items ?? []) if (it.type === "duck" && it.quackOn) { const w = wordAt(b, it.quackOn); if (w) it.quackAt = w.t; }
+}
+
 // loudness envelope at character frame rate -> lip flaps
 const pcm = sh("ffmpeg", ["-v", "error", "-i", narration, "-f", "s16le", "-ac", "1", "-ar", "16000", "-"], { maxBuffer: 1 << 30 });
 const samples = new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.length / 2));
@@ -212,7 +229,7 @@ BEATS.forEach((b, i) => {
 const mix = new Float32Array(Math.ceil((TOTAL + 1) * 44100)); // sfx
 if (SFX_AVAILABLE) {
   // SFX Kit cues: `at` is the moment the sound's sync point should meet (GUIDE.md: start = moment - sync.at)
-  const cues = [], cue = (id, at, gainDb = 0) => cues.push({ id, at, gainDb });
+  const cues = [], cue = (id, at, gainDb = 0) => cues.push({ id, at, gainDb }); var quacks = [];
   BEATS.forEach((b, i) => {
     const t0 = b.start, tr = TR[i];
     if (tr === "whip") cue("whoosh-fast-medium", t0 + 0.09);           // move-peak: ~25% into the ease-out whip
@@ -229,10 +246,18 @@ if (SFX_AVAILABLE) {
       phone: ["phone-vibrate-hand", 0.5], coffee: ["foley-glass-touch", 0.35], read: ["props-page-turn", 0.4], giveGift: ["props-box-open", 0.45], sneak: ["foley-fabric-slide", 0.2], dance: ["move-bounce", 0.2] }[b.pose];
     if (act && BEATS[i - 1]?.pose !== b.pose) cue(act[0], t0 + act[1], -3);
     if (b.riser) cue("riser-2s-soft", t0 + b.riser);
-    if (b.quiz) { b.quiz.options.forEach((_, j) => cue("pop-medium-in", t0 + (b.quiz.at?.[j] ?? 0.9 + j * 0.7) + 0.05, -2)); cue("time-clock-fast", t0 + 2.6, -6); cue("notification-success-chime", t0 + b.dur - 1.15, -1); }                    // arrival at the reveal
+    if (b.quiz) { b.quiz.at.forEach((a) => cue("pop-medium-in", t0 + a + 0.05, -2)); cue("time-countdown", t0 + b.quiz.countFrom, -4); cue("notification-success-chime", t0 + b.quiz.revealAt, -1); }
+    for (const it of b.items ?? []) if (it.type === "duck" && it.quackAt !== undefined) quacks.push(t0 + it.quackAt);                    // arrival at the reveal
   });
   const speech = BEATS.map((b) => [b.start, b.start + b.speech]);
   const placed = mixCues(mix, cues, speech, 10 ** (-2 / 20));
+  // a quick, subtle duck quack (synthesised: nasal buzz through a "beak" formant)
+  if (quacks.length) {
+    const qf = join(sfxDir, "quack.wav");
+    if (!existsSync(qf)) sh("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "aevalsrc='0.6*(2*mod(t*(520-500*t),1)-1)*sin(PI*min(1,t/0.02))*exp(-t*9)':d=0.22", "-af", "bandpass=f=1250:w=900,bandpass=f=1100:w=1200,volume=2.2", "-ar", "44100", "-ac", "1", qf]);
+    const q = readPcm(qf);
+    for (const at of quacks) { const o = Math.floor(at * 44100); for (let j = 0; j < q.length && o + j < mix.length; j++) mix[o + j] += (q[j] / 32768) * 0.45; }
+  }
   console.log(`sfx: ${placed.length} SFX Kit cues`);
 } else {
   for (const [t, k, v] of events) { const o = Math.max(0, Math.floor(t * 44100)), s = sfxPcm[k]; for (let j = 0; j < s.length && o + j < mix.length; j++) mix[o + j] += (s[j] / 32768) * v * 0.7; }
@@ -288,7 +313,7 @@ const TALKERS = new Set(["explain", "wave", "shrug", "crossArms", "think", "stan
 
 function placement(b, lt) {
   let x = b.x ?? (b.quiz && !VERTICAL ? 360 : b.card && !VERTICAL ? 640 : W / 2);
-  if (b.walk) x = b.walk[0] + (b.walk[1] - b.walk[0]) * Math.min(1, lt / b.dur);
+  if (b.walk) x = b.walk[0] + (b.walk[1] - b.walk[0]) * (b.pose === "run" ? EASE.power2.out : EASE.sine.inOut)(Math.min(1, lt / (b.walkDur ?? b.dur)));
   const lib = POSE_LIB[b.pose], y = b.y ?? (GROUND - (lib.sitH ?? (lib.sit ? 58 : 130)) * SCALE);
   return [x, y];
 }
@@ -354,7 +379,8 @@ function frameSVG(t) {
   // acting (MOTION.md §3): anticipation (small counter-move), then a back.out overshoot settle;
   // overlapping action: body leads, arms trail ~50/80 ms, head ~60 ms
   const snap = i === 0 || sceneChanged || lyingSwap;
-  const act = (d) => snap ? 1 : keys(ltc - d, [[0, 0], [0.08, -0.07, EASE.sine.out], [0.5, 1, EASE.back.out]]);
+  const sf = b.settle ? b.settle / 0.5 : 1; // slower, readable transitions (e.g. sitting down)
+  const act = (d) => snap ? 1 : keys(ltc - d, [[0, 0], [0.08 * sf, -0.07, EASE.sine.out], [0.5 * sf, 1, b.settle ? EASE.cinematic : EASE.back.out]]);
   const kBody = act(0), kArmL = act(0.05), kArmR = act(0.08), kHead = act(0.06);
   const k = kBody;
   const prevR = resolved[Math.max(0, i - 1)], curR = resolved[i];
@@ -365,11 +391,9 @@ function frameSVG(t) {
   const ph = tc * 2 * Math.PI;
   const speaking = ltc < b.speech, lv = speaking ? loud(tc) : 0;
   if (b.pose !== "lie" && b.pose !== "lieAwake") {
-    pose.lift += Math.sin(ph * 0.55) * 3.5;
-    pose.lean += Math.sin(tc * 1.3) * 1.6 + Math.sin(tc * 0.37) * 1.2;
-    pose.headTilt += Math.sin(tc * 0.9 + 1) * 2.5 + lv * Math.sin(tc * 9) * 3.5; // head bobs with the voice
-    // breathing arms + small talking gestures
-    const g = speaking && TALKERS.has(b.pose) ? 1 : 0.35;
+    // standing still means still: only the head moves with the voice, plus talking gestures
+    pose.headTilt += lv * Math.sin(tc * 9) * 3;
+    const g = speaking && TALKERS.has(b.pose) ? 1 : 0;
     pose.armL = { ...pose.armL, a1: pose.armL.a1 + Math.sin(tc * 1.7) * 3 * g, a2: pose.armL.a2 + Math.sin(tc * 2.3 + 1) * 6 * g };
     if (!pose.overHead) pose.armR = { ...pose.armR, a1: pose.armR.a1 + Math.sin(tc * 1.9 + 2) * 3 * g, a2: pose.armR.a2 + Math.sin(tc * 2.1 + 3) * 6 * g };
   } else pose.lift += Math.sin(ph * 0.25) * 2; // sleeping breath
@@ -405,10 +429,7 @@ function frameSVG(t) {
     pose.lift += Math.abs(w) * 10; pose.lean += w * 3;
     pose.legR = { ...pose.legR, a1: pose.legR.a1 + w * 10 };
   }
-  if (POSE_LIB[b.pose].sit && anim !== "type") {
-    pose.legL = { ...pose.legL, a2: pose.legL.a2 + Math.sin(ph * 0.8) * 8 };
-    pose.legR = { ...pose.legR, a2: pose.legR.a2 - Math.sin(ph * 0.8 + 1) * 8 };
-  }
+
   if (anim === "walk") {
     const w = Math.sin(ph * 1.7);
     pose.legL = { ...pose.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 };
@@ -424,7 +445,7 @@ function frameSVG(t) {
 
   // squash & stretch on a pose snap (character frames 0..3)
   // squash on the anticipation, stretch on the release, settle (volume preserved)
-  const sy = poseChanged ? keys(ltc, [[0, 1], [0.08, 0.93, EASE.sine.out], [0.2, 1.05, EASE.power2.out], [0.42, 1, EASE.sine.inOut]]) : 1, sx = 1 / Math.sqrt(sy);
+  const sy = poseChanged ? keys(ltc / (b.settle ? b.settle / 0.5 : 1), [[0, 1], [0.08, 0.93, EASE.sine.out], [0.2, 1.05, EASE.power2.out], [0.42, 1, EASE.sine.inOut]]) : 1, sx = 1 / Math.sqrt(sy);
 
   const [x1, y1] = placement(b, lt);
   const [x0, y0] = sceneChanged ? [x1, y1] : placement(pb, pb.dur);
@@ -458,10 +479,9 @@ function frameSVG(t) {
   for (const [pi, pp] of (b.people ?? []).entries()) {
     const key = JSON.stringify(pp);
     const base = (PEOPLE_CACHE[key] ??= resolvePose({ ...POSE_LIB[pp.pose ?? "stand"], ...(pp.expr ? { expr: pp.expr } : {}), acc: pp.acc }));
-    const q = { ...base, lift: base.lift + Math.sin((tc + pi) * 2 * Math.PI * 0.5) * 3, headTilt: base.headTilt + Math.sin(tc * 0.8 + pi * 2) * 4,
-      lean: base.lean + Math.sin(tc * 1.1 + pi) * 1.5 };
+    const q = { ...base }; // background people stand still unless they have an action
     const pph = (tc + pi * 0.37) * 2 * Math.PI, pa = pp.anim ?? POSE_LIB[pp.pose ?? "stand"].anim;
-    q.armL = { ...q.armL, a2: q.armL.a2 + Math.sin(tc * 2 + pi) * 6 }; q.armR = { ...q.armR, a2: q.armR.a2 + Math.sin(tc * 2.2 + pi * 2) * 6 };
+
     if (pa === "walk" || pp.walk) {
       const w = Math.sin(pph * 1.7);
       q.legL = { ...q.legL, a1: -4 + 26 * w, a2: -4 + 26 * w - Math.max(0, -w) * 30 }; q.legR = { ...q.legR, a1: 4 - 26 * w, a2: 4 - 26 * w - Math.max(0, w) * 30 };
@@ -492,7 +512,8 @@ function frameSVG(t) {
       pop *= 1 - 0.35 * out; op = 1 - out;
     }
     const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
-    out += `<g opacity="${op.toFixed(3)}" transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], it.arg)}</g>`;
+    const arg = it.type === "duck" ? { ...it.arg, t, quack: it.quackAt !== undefined && lt >= it.quackAt && lt < it.quackAt + 0.22 } : it.arg;
+    out += `<g opacity="${op.toFixed(3)}" transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], arg)}</g>`;
   } return out; };
   world += drawItems(false);
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
@@ -583,10 +604,16 @@ function frameSVG(t) {
   // quiz: three options pop in one by one, a clock ticks, the answer lights up green at the end
   if (b.quiz) {
     const qz = b.quiz, cyq = VERTICAL ? 1560 : 420, w = VERTICAL ? 300 : 340, gap = 30, qcx = VERTICAL ? OW / 2 : OW / 2 + 230, x0 = qcx - (3 * w + 2 * gap) / 2;
-    const reveal = lt >= b.dur - 1.2, qa = seg(lt, 0.1, 0.35, EASE.back.out);
+    const reveal = lt >= qz.revealAt, qa = seg(lt, 0.1, 0.35, EASE.back.out);
+    if (lt >= qz.countFrom && !reveal) { // 3-2-1 countdown ring while the viewer guesses
+      const span = qz.revealAt - qz.countFrom, el = lt - qz.countFrom, n = Math.max(1, 3 - Math.floor((el / span) * 3)), fr = ((el / span) * 3) % 1;
+      const r = 54, circ = 2 * Math.PI * r, pulse = 1 + 0.12 * (1 - EASE.power2.out(Math.min(1, fr * 3)));
+      s += `<g transform="translate(${VERTICAL ? OW / 2 : OW / 2 + 230},${(VERTICAL ? 1780 : 600)}) scale(${pulse.toFixed(3)})"><circle r="${r + 10}" fill="#1b1b22" stroke="#000" stroke-width="5"/><circle r="${r}" fill="none" stroke="#ffd84d" stroke-width="10" stroke-dasharray="${circ}" stroke-dashoffset="${(circ * fr).toFixed(1)}" transform="rotate(-90)"/>
+        <text y="24" text-anchor="middle" font-size="70" fill="#fff" style="${M}">${n}</text></g>`;
+    }
     s += `<g transform="translate(${qcx},${cyq - 120}) scale(${qa.toFixed(3)})"><rect x="-330" y="-48" width="660" height="88" rx="44" fill="#1b1b22" stroke="#000" stroke-width="5"/><text x="0" y="16" text-anchor="middle" font-size="46" fill="#fff" style="${M}">${esc(qz.q)}</text></g>`;
     qz.options.forEach((o, j) => {
-      const t0q = qz.at?.[j] ?? 0.9 + j * 0.7, sp = spring(lt - t0q, { stiffness: 280, damping: 14 }), right = reveal && j === qz.answer, wrong = reveal && j !== qz.answer;
+      const t0q = qz.at[j], sp = spring(lt - t0q, { stiffness: 280, damping: 14 }), right = reveal && j === qz.answer, wrong = reveal && j !== qz.answer;
       if (sp <= 0) return;
       s += `<g transform="translate(${x0 + j * (w + gap) + w / 2},${cyq}) scale(${(sp * (right ? 1.1 : 1)).toFixed(3)})" opacity="${wrong ? 0.45 : 1}"><rect x="${-w / 2 + 6}" y="-44" width="${w}" height="96" rx="24" fill="rgba(0,0,0,.25)"/><rect x="${-w / 2}" y="-50" width="${w}" height="96" rx="24" fill="${right ? "#7CFF8B" : "#fff"}" stroke="#000" stroke-width="6"/>
         <circle cx="${-w / 2 + 44}" cy="-2" r="26" fill="${["#ff5a4a", "#5b8fd9", "#ffd84d"][j]}" stroke="#000" stroke-width="4"/><text x="${-w / 2 + 44}" y="12" text-anchor="middle" font-size="36" fill="#fff" stroke="#000" stroke-width="5" paint-order="stroke" style="${M}">${"ABC"[j]}</text>

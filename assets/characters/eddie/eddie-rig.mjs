@@ -163,12 +163,48 @@ const TALK = [
   `<path d="M-12,20 Q0,18 12,20 Q11,36 0,37 Q-11,36 -12,20 Z" fill="${P.ink}"/><path d="M-6,32 Q0,28 6,32 Q3,36 0,36 Q-3,36 -6,32 Z" fill="${P.grey}"/>`,
 ];
 // Accessories so background people read as different characters (Eddie stays bald).
+// Accessories so background people read as different characters (Eddie stays bald).
+// Each has shading, construction lines and small details so it reads as a real object.
+const shade = (id, c, k = 0.78) => {
+  const n = parseInt(c.slice(1), 16), d = (v) => Math.round(v * k).toString(16).padStart(2, "0");
+  const dark = `#${d(n >> 16)}${d((n >> 8) & 255)}${d(n & 255)}`;
+  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}"/><stop offset="1" stop-color="${dark}"/></linearGradient></defs>`;
+};
 const ACC = {
-  cap: (c = "#e5584f") => `<path d="M-50,-14 Q-50,-62 0,-62 Q50,-62 50,-14 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/><path d="M8,-16 L74,-14 Q78,-6 70,-4 L6,-6 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>`,
-  bun: (c = "#3a2a20") => `<circle cx="0" cy="-66" r="17" fill="${c}" stroke="${P.ink}" stroke-width="4"/><path d="M-50,-4 Q-52,-58 0,-60 Q52,-58 50,-4 Q36,-38 0,-40 Q-36,-38 -50,-4 Z" fill="${c}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>`,
-  glasses: () => `<g fill="rgba(255,255,255,.25)" stroke="${P.ink}" stroke-width="4"><circle cx="-17" cy="10" r="13"/><circle cx="17" cy="10" r="13"/></g><path d="M-4,8 Q0,4 4,8 M-30,8 L-48,2 M30,8 L48,2" fill="none" stroke="${P.ink}" stroke-width="4"/>`,
-  beanie: (c = "#5b8fd9") => `<path d="M-52,-8 Q-54,-66 0,-66 Q54,-66 52,-8 Z" fill="${c}" stroke="${P.ink}" stroke-width="4.5"/><rect x="-54" y="-18" width="108" height="16" rx="6" fill="${c}" stroke="${P.ink}" stroke-width="4"/><circle cx="0" cy="-70" r="10" fill="${c}" stroke="${P.ink}" stroke-width="4"/>`,
-  pigtails: (c = "#3a2a20") => `<circle cx="-56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><circle cx="56" cy="-10" r="15" fill="${c}" stroke="${P.ink}" stroke-width="4"/><path d="M-50,-6 Q-52,-60 0,-60 Q52,-60 50,-6 Q30,-36 0,-34 Q-30,-36 -50,-6 Z" fill="${c}" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>`,
+  cap: (c = "#e5584f") => { const id = "cap" + c.slice(1); return shade(id, c) +
+    // crown with panel seams + button, curved brim with underside shadow, small logo patch
+    `<path d="M-51,-12 Q-52,-64 0,-65 Q52,-64 51,-12 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>` +
+    `<path d="M0,-64 L0,-14 M-27,-60 Q-34,-36 -36,-13 M27,-60 Q34,-36 36,-13" fill="none" stroke="${P.ink}" stroke-width="1.6" opacity=".35"/>` +
+    `<ellipse cx="0" cy="-64" rx="6" ry="3.5" fill="${c}" stroke="${P.ink}" stroke-width="2.5"/>` +
+    `<path d="M-30,-48 Q-18,-58 -4,-60" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".45"/>` +
+    `<rect x="-14" y="-40" width="28" height="18" rx="4" fill="#fff" stroke="${P.ink}" stroke-width="2"/><path d="M-6,-31 L6,-31" stroke="${c}" stroke-width="3" stroke-linecap="round"/>` +
+    `<path d="M6,-16 Q44,-22 76,-12 Q80,-5 72,-1 Q40,-8 4,-5 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>` +
+    `<path d="M10,-7 Q40,-11 70,-4" fill="none" stroke="${P.ink}" stroke-width="2" opacity=".35"/>` +
+    `<path d="M-50,-12 L50,-12" stroke="${P.ink}" stroke-width="3" opacity=".5"/>`; },
+  bun: (c = "#3a2a20") => { const id = "hair" + c.slice(1); return shade(id, c, 0.7) +
+    `<circle cx="0" cy="-68" r="18" fill="url(#${id})" stroke="${P.ink}" stroke-width="4"/>` +
+    `<path d="M-10,-74 Q0,-84 10,-74 M-12,-64 Q0,-58 12,-66" fill="none" stroke="#fff" stroke-width="2" opacity=".25"/>` +
+    `<rect x="-11" y="-55" width="22" height="7" rx="3.5" fill="#e9767a" stroke="${P.ink}" stroke-width="2.5"/>` +
+    `<path d="M-50,-4 Q-52,-58 0,-60 Q52,-58 50,-4 Q36,-38 0,-40 Q-36,-38 -50,-4 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>` +
+    `<path d="M-36,-30 Q-26,-48 -6,-54 M8,-54 Q30,-48 38,-30 M-20,-46 Q-10,-52 2,-53" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".25"/>`; },
+  glasses: () => `<g fill="rgba(200,230,255,.22)" stroke="${P.ink}" stroke-width="4.5"><rect x="-31" y="-3" width="27" height="24" rx="10"/><rect x="4" y="-3" width="27" height="24" rx="10"/></g>` +
+    `<path d="M-23,2 L-12,13 M12,2 L23,13" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>` +
+    `<path d="M-4,6 Q0,2 4,6 M-31,4 L-49,0 M31,4 L49,0" fill="none" stroke="${P.ink}" stroke-width="4" stroke-linecap="round"/>`,
+  beanie: (c = "#5b8fd9") => { const id = "bean" + c.slice(1); let rib = "";
+    for (let x = -46; x <= 46; x += 8) rib += `M${x},-18 L${x},-3 `;
+    return shade(id, c) +
+    `<path d="M-52,-8 Q-54,-68 0,-68 Q54,-68 52,-8 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4.5"/>` +
+    `<path d="M-34,-54 Q-20,-64 -2,-66" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".35"/>` +
+    `<path d="M-40,-30 Q0,-40 40,-30 M-46,-44 Q0,-56 46,-44" fill="none" stroke="${P.ink}" stroke-width="1.6" opacity=".25"/>` +
+    `<rect x="-55" y="-20" width="110" height="19" rx="7" fill="${c}" stroke="${P.ink}" stroke-width="4"/>` +
+    `<path d="${rib}" stroke="${P.ink}" stroke-width="1.6" opacity=".35"/>` +
+    [[-6, -74], [6, -76], [0, -82], [-4, -68], [7, -68]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="${c}"/>`).join("") +
+    `<circle cx="0" cy="-74" r="12" fill="none" stroke="${P.ink}" stroke-width="3.5" stroke-dasharray="4 2"/>`; },
+  pigtails: (c = "#3a2a20") => { const id = "hair" + c.slice(1); return shade(id, c, 0.7) +
+    `<path d="M-52,-16 Q-80,-6 -70,22 Q-56,14 -50,-4 Z M52,-16 Q80,-6 70,22 Q56,14 50,-4 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>` +
+    `<rect x="-60" y="-18" width="12" height="10" rx="4" fill="#ffd84d" stroke="${P.ink}" stroke-width="2.5"/><rect x="48" y="-18" width="12" height="10" rx="4" fill="#ffd84d" stroke="${P.ink}" stroke-width="2.5"/>` +
+    `<path d="M-50,-6 Q-52,-60 0,-60 Q52,-60 50,-6 Q30,-36 0,-34 Q-30,-36 -50,-6 Z" fill="url(#${id})" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>` +
+    `<path d="M0,-58 L0,-36 M-30,-44 Q-18,-54 -4,-56" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".25"/>`; },
 };
 
 // Parametric talking mouth: open 0..1, shape "neutral" | "wide" | "round".
@@ -264,7 +300,7 @@ export const PROPS = {
     return g + `</g>`;
   },
   thought: (o, a = {}) => {
-    const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
+    const lines = a.pic ? [" ".repeat(6)] : String(a.t ?? "").split("|"), tail = a.tail ?? -1;
     const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 80, h = lines.length * 44 + 52;
     let bumps = "";
     const n = Math.max(6, Math.round(w / 50));
@@ -276,7 +312,30 @@ export const PROPS = {
       <circle cx="${tail * w * 0.3 + 4}" cy="${h / 2 + 30}" r="12" fill="rgba(20,20,30,.2)"/><circle cx="${tail * w * 0.3}" cy="${h / 2 + 26}" r="12" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="4"/>
       <circle cx="${tail * w * 0.39}" cy="${h / 2 + 54}" r="7" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="3.5"/>
       <path d="M${-w * 0.3},${-h * 0.32} Q${-w * 0.1},${-h * 0.46} ${w * 0.12},${-h * 0.4}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"/>` +
-      lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="36" fill="#2a2a33" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
+      (a.pic === "bread"
+        ? `<g transform="translate(0,4)"><path d="M-34,-6 Q-38,-26 -18,-28 Q0,-36 18,-28 Q38,-26 34,-6 L30,22 Q0,28 -30,22 Z" fill="#e8b974" stroke="${P.ink}" stroke-width="3.5" stroke-linejoin="round"/><path d="M-24,-4 Q-26,-18 -12,-20 Q0,-25 12,-20 Q26,-18 24,-4 L21,16 Q0,20 -21,16 Z" fill="#fbe7c2"/><circle cx="-8" cy="2" r="2" fill="#d9a35a"/><circle cx="8" cy="-6" r="2" fill="#d9a35a"/><circle cx="4" cy="10" r="2" fill="#d9a35a"/></g>`
+        : lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="36" fill="#2a2a33" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("")) + `</g>`;
+  },
+  // duck in Eddie's style: shaded body, wing, eye shine, beak that opens on a quack; bobs on the water
+  duck: (o, a = {}) => {
+    const t = a.t ?? 0, bob = Math.sin(t * 2.2) * 3, nod = a.quack ? -10 : Math.sin(t * 1.3) * 4, open = a.quack ? 1 : 0;
+    return `<g transform="translate(${o[0]},${o[1] + bob}) scale(${a.flip ? -1 : 1},1)">
+      <defs><radialGradient id="duckShade" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dcdce6"/></radialGradient></defs>
+      <path d="M-58,0 Q-70,-20 -48,-30 Q-20,-44 22,-34 Q48,-28 50,-6 Q46,14 10,16 L-40,16 Q-60,14 -58,0 Z" fill="url(#duckShade)" stroke="${P.ink}" stroke-width="4.5" stroke-linejoin="round"/>
+      <path d="M-56,-14 L-74,-26 L-62,-6 Z" fill="url(#duckShade)" stroke="${P.ink}" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M-30,-14 Q-6,-30 18,-14 Q-2,2 -30,-14 Z" fill="#ececf2" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-22,-14 Q-6,-20 10,-14" fill="none" stroke="${P.ink}" stroke-width="1.6" opacity=".4"/>
+      <g transform="rotate(${nod},28,-28)">
+        <circle cx="34" cy="-46" r="23" fill="url(#duckShade)" stroke="${P.ink}" stroke-width="4.5"/>
+        <path d="M14,-32 Q30,-20 48,-30" fill="none" stroke="#e4e4ec" stroke-width="5" stroke-linecap="round"/>
+        <path d="M20,-58 Q28,-66 38,-66" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+        <circle cx="42" cy="-50" r="3.8" fill="${P.ink}"/><circle cx="43.3" cy="-51.6" r="1.4" fill="#fff"/>
+        <path d="M54,-46 Q69,${-48 - open * 6} 75,${-42 - open * 4} Q65,-39 54,-40 Z" fill="#f6a63c" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M54,-38 Q67,${-35 + open * 7} 72,${-36 + open * 8} Q63,-32 54,-35 Z" fill="#e58a22" stroke="${P.ink}" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="31" cy="-38" r="4" fill="#ffb3b3" opacity=".6"/>
+      </g>
+      <path d="M-80,18 Q-60,10 -40,18 Q-20,26 0,18 Q20,10 40,18 Q60,26 80,18" fill="none" stroke="#5f9fd0" stroke-width="5" stroke-linecap="round"/>
+    </g>`;
   },
   say: (o, a = {}) => {
     const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
