@@ -18,6 +18,7 @@ const outline = (txt, x, y, size, fill = "#fff", anchor = "middle", sw = 0.2) =>
 const tag = (txt, x, y, w, fill = "#ff5a4a", size = 64) => `<g transform="translate(${x},${y}) rotate(-3)">
   <rect x="6" y="8" width="${w}" height="${size * 1.45}" rx="16" fill="rgba(0,0,0,.3)"/><rect width="${w}" height="${size * 1.45}" rx="16" fill="${fill}" stroke="#000" stroke-width="7"/>
   <text x="${w / 2}" y="${size * 1.08}" text-anchor="middle" font-size="${size}" fill="#fff" style="${M}">${txt}</text></g>`;
+const burst = (c1, c2) => `<rect width="1280" height="720" fill="${c1}"/>` + [...Array(12)].map((_, i) => { const a0 = (i * 30) * Math.PI / 180, a1 = (i * 30 + 15) * Math.PI / 180; return `<path d="M640,360 L${640 + Math.cos(a0) * 1200},${360 + Math.sin(a0) * 1200} L${640 + Math.cos(a1) * 1200},${360 + Math.sin(a1) * 1200} Z" fill="${c2}"/>`; }).join("");
 const world = (svg) => `<g transform="scale(${1280 / 1920})">${svg}</g>`; // 1920x1080 scenes -> 1280x720
 
 const items = {
@@ -70,6 +71,31 @@ const items = {
       <g transform="translate(640,400) scale(4.6)">${head("wrecked")}</g>
       ${outline("TOO LOUD", 640, 700, 96, "#ffd84d")}`;
   }],
+  // ---- v2 thumbnails (after ep1's 1.6% CTR): bright flat colour, one giant face, 2-3 huge words ----
+  "ep02-thumb-D-she-can-hear-me": [1280, 720, () => `${burst("#ffd23f", "#ffe680")}
+      <g transform="translate(330,385) scale(4.3) rotate(-5)">${head("shocked")}</g>
+      <g transform="translate(1010,500) scale(3.1) rotate(4)">${head("happy", 0, ["beanie:#a98bd6", "glasses"])}</g>
+      <g transform="translate(985,110) scale(1.75)">${PROPS.thought([0, 0], { t: "…hi, Eddie.", to: [14, 84] })}</g>
+      ${outline("SHE CAN", 330, 112, 104, "#fff", "middle", 0.22)}${outline("HEAR ME?!", 410, 700, 118, "#ff4b3e", "middle", 0.2)}`],
+  "ep02-thumb-E-i-hear-everything": [1280, 720, () => {
+    const b = (t, x, y, sc, to) => `<g transform="translate(${x},${y}) scale(${sc}) rotate(${x < 640 ? -5 : 5})">${PROPS.thought([0, 0], { t, to })}</g>`;
+    return `${burst("#3fc1ff", "#8fdcff")}
+      ${b("LIAR!", 210, 150, 1.9, [90, 60])}${b("ew.", 1090, 130, 1.9, [-80, 70])}${b("nice shirt", 190, 430, 1.5, [110, -10])}${b("I'm so late", 1090, 400, 1.5, [-110, 0])}
+      <g transform="translate(640,275) scale(4.3)">${head("shocked")}</g>
+      ${outline("I CAN HEAR", 640, 615, 110, "#fff", "middle", 0.2)}${outline("EVERYONE", 640, 708, 110, "#ffe14d", "middle", 0.2)}`;
+  }],
+  "ep02-thumb-F-day1-day30": [1280, 720, () => `<rect width="640" height="720" fill="#57d68d"/><rect x="640" width="640" height="720" fill="#ff5a4a"/>
+      <circle cx="320" cy="360" r="300" fill="#8ff0b5"/><circle cx="960" cy="360" r="300" fill="#ff8a7d"/>
+      <g transform="translate(320,330) scale(4.6) rotate(-4)">${head("happy", 2)}</g>
+      <g transform="translate(960,340) scale(4.6) rotate(5)">${head("wrecked")}</g>
+      <g transform="translate(1085,150) scale(1.5)">${PROPS.thought([0, 0], { t: "LIAR", to: [-60, 60] })}</g><g transform="translate(790,140) scale(1.3)">${PROPS.thought([0, 0], { t: "ugh", to: [70, 70] })}</g>
+      <path d="M640,0 L640,720" stroke="#000" stroke-width="14"/>
+      ${outline("DAY 1", 320, 690, 120)}${outline("DAY 30", 960, 690, 120, "#ffe14d")}`],
+  // episode 1 replacement (same recipe)
+  "ep01-thumb-D-day30-no-sleep": [1280, 720, () => `${burst("#ff8a3d", "#ffb36b")}
+      <g transform="translate(880,390) scale(5.6) rotate(5)">${head("wrecked")}</g>
+      ${outline("30 DAYS", 330, 300, 128, "#fff", "middle", 0.2)}${outline("NO SLEEP", 350, 450, 118, "#ffe14d", "middle", 0.2)}
+      ${tag("WHAT HAPPENS?", 80, 520, 520, "#1b1b20", 56)}`],
   // channel profile picture (crops to a circle)
   "profile-800": [800, 800, () => `<rect width="800" height="800" fill="#ffd84d"/><circle cx="400" cy="400" r="330" fill="#fff4c2"/>
       <g transform="translate(400,420) scale(5.2) rotate(-4)">${head("happy", 2)}</g>`],
@@ -94,8 +120,9 @@ for (const [name, [w, h, fn]] of Object.entries(items)) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
   await page.setContent(`<html><head><style>@font-face{font-family:MBlack;font-weight:900;src:url(data:font/woff2;base64,${black}) format("woff2");}
     @font-face{font-family:InkHand;src:url(data:font/ttf;base64,${hand}) format("truetype");}
+    @font-face{font-family:Bubble;font-weight:800;src:url(data:font/woff2;base64,${readFileSync(join(here, "nunito-800.woff2")).toString("base64")}) format("woff2");}
     body{margin:0}</style></head><body><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${fn()}</svg></body></html>`);
-  await page.evaluate(() => Promise.all([document.fonts.load("900 40px MBlack"), document.fonts.load("40px InkHand")]));
+  await page.evaluate(() => Promise.all([document.fonts.load("900 40px MBlack"), document.fonts.load("40px InkHand"), document.fonts.load("800 40px Bubble")]));
   await page.screenshot({ path: join(out, `${name}.png`) });
   await page.close();
 }

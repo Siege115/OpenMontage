@@ -29,17 +29,16 @@ const CUP = HAND_OFF("amazing", "coffee", "foley-glass-touch");
 const studio = (tone) => ({ name: "studio", tone });
 
 export const BEATS = [
-  // ================= HOOK =================
-  { pose: "lieAwake", expr: "neutral", x: 470, y: 690, blanket: true, scene: { name: "bedroom", clock: "7:02" },
-    items: [ON({ ...T("where are my socks?!", 1500, 260, 1.2, 1), who: "none" }, "Thinking")], text: "Tomorrow morning, you wake up… and you hear a voice. It's your neighbor. Through the wall. Thinking." },
-  { pose: "shocked", x: 1080, scene: { name: "bedroom", clock: "7:03" }, text: "You can hear everyone's thoughts." },
+  // ================= HOOK (v3: cold open on the Day 30 moment, Day 1 starts by ~0:13) =================
+  { pose: "shocked", x: 800, scene: { name: "rooftop" }, riser: 0.2, people: [{ x: 1160, ...MIA, expr: "happy", flip: true }],
+    cam: { from: [980, 450], to: [1100, 380], z0: 1.15, z1: 1.5 }, items: [ON({ ...T("…hi, Eddie.", 1160, 200, 1.2, -1), who: 0 }, "back")],
+    text: "This is you, thirty days after you start hearing everyone's thoughts. And somebody just thought back." },
+  { pose: "shocked", x: 1080, scene: { name: "bedroom", clock: "7:02" }, items: [ON({ ...T("where are my socks?!", 1500, 260, 1.2, 1), who: "none" }, "everyone")],
+    text: "It starts tomorrow morning. You wake up, and you can hear everyone." },
   { pose: "walk", walk: [200, 900], scene: { name: "street", day: true },
     people: [{ x: 1300, ...SAM, anim: "wave", animTo: 2.4, flip: true }, { walk: [1900, 1500], acc: "pigtails", anim: "walk", flip: true, dog: true }],
     items: [ON({ ...T("is it Friday yet?", 1640, 300, 1.6, -1), who: 1 }, "secret"), ON({ ...T("cute dog!", 1300, 150, 2.6, 1), who: 0 }, "opinion")],
-    text: "Not their voices. Their thoughts. Every secret. Every opinion. Every random little idea." },
-  { pose: "celebrate", scene: studio("#fbefc4"), card: "NEVER LIED TO AGAIN", text: "It sounds like the ultimate superpower. You'd never be lied to again." },
-  { pose: "crossArms", x: 960, scene: studio("#f9dcd6"), cam: { from: [960, 520], to: [960, 330], z0: 1.0, z1: 1.6 },
-    text: "But by day thirty, you'll discover something about this power that changes everything. Let's find out." },
+    text: "Every secret. Every opinion. Every random little idea. So how did you end up on that rooftop?" },
 
   // ================= DAY 1: the fun =================
   { pose: "stand", expr: "happy", day: "DAY 1", x: 1150, scene: { name: "cafe" }, people: [{ ...BARISTA, act: CUP.giver }, { x: 760, acc: "beanie", expr: "neutral", anim: "pray" }],
