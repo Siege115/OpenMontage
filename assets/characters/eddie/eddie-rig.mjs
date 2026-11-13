@@ -246,6 +246,44 @@ export function head(expr = "neutral", mouth = 0, acc = null) {
 
 const BUBBLE_DEFS = `<defs><linearGradient id="bubbleShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebf1"/></linearGradient></defs>`;
 const chipStack = (x, y, n, col) => { let g = ""; for (let i = 0; i < n; i++) g += `<ellipse cx="${x}" cy="${y - i * 7}" rx="21" ry="8" fill="${col}" stroke="${P.ink}" stroke-width="2.4"/><path d="M${x - 10},${y - i * 7} L${x - 6},${y - i * 7} M${x + 6},${y - i * 7} L${x + 10},${y - i * 7}" stroke="#fff" stroke-width="2.4"/>`; return g; };
+// Bubble tails aimed at the speaker: a.to = [x, y] (bubble-local) is the top of their head.
+const edgeToward = (w, h, to) => { const ang = Math.atan2(to[1], to[0]); return [Math.cos(ang) * w / 2, Math.sin(ang) * h / 2]; };
+function bubbleThought(o, a) {
+  const lines = a.pic ? [" ".repeat(6)] : String(a.t ?? "").split("|");
+  const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 80, h = lines.length * 44 + 52;
+  const n = Math.max(6, Math.round(w / 50));
+  let bumps = ""; for (let i = 0; i < n; i++) { const ang = (i / n) * Math.PI * 2; bumps += `<circle cx="${f(Math.cos(ang) * w * 0.47)}" cy="${f(Math.sin(ang) * h * 0.47)}" r="${f(Math.min(w, h) * 0.25 + (i % 2) * 4)}"/>`; }
+  const body = `${bumps}<ellipse rx="${w / 2}" ry="${h / 2}"/>`;
+  // trail of shrinking dots from the cloud's edge to just above the thinker's head
+  const e = edgeToward(w * 1.12, h * 1.18, a.to), d = [a.to[0] - e[0], a.to[1] - e[1]], len = Math.hypot(...d) || 1;
+  const reach = Math.max(0, Math.min(1, (len - 18) / len));
+  const dots = [[0.22, 13], [0.52, 9], [0.8, 6]].map(([k, r]) => { const x = e[0] + d[0] * k * reach, y = e[1] + d[1] * k * reach;
+    return `<circle cx="${f(x + 4)}" cy="${f(y + 4)}" r="${r}" fill="rgba(20,20,30,.2)"/><circle cx="${f(x)}" cy="${f(y)}" r="${r}" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="${r > 10 ? 4 : 3.5}"/>`; }).join("");
+  return `<g transform="translate(${o[0]},${o[1]})">${BUBBLE_DEFS}${dots}
+    <g transform="translate(7,9)" fill="rgba(20,20,30,.22)">${body}</g>
+    <g fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="9">${body}</g><g fill="url(#bubbleShade)">${body}</g>
+    <path d="M${-w * 0.3},${-h * 0.32} Q${-w * 0.1},${-h * 0.46} ${w * 0.12},${-h * 0.4}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"/>` +
+    (a.pic === "bread"
+      ? `<g transform="translate(0,4)"><path d="M-34,-6 Q-38,-26 -18,-28 Q0,-36 18,-28 Q38,-26 34,-6 L30,22 Q0,28 -30,22 Z" fill="#e8b974" stroke="${P.ink}" stroke-width="3.5" stroke-linejoin="round"/><path d="M-24,-4 Q-26,-18 -12,-20 Q0,-25 12,-20 Q26,-18 24,-4 L21,16 Q0,20 -21,16 Z" fill="#fbe7c2"/><circle cx="-8" cy="2" r="2" fill="#d9a35a"/><circle cx="8" cy="-6" r="2" fill="#d9a35a"/><circle cx="4" cy="10" r="2" fill="#d9a35a"/></g>`
+      : lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 44 + 13}" text-anchor="middle" font-size="36" fill="#2a2a33" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("")) + `</g>`;
+}
+function bubbleSay(o, a) {
+  const lines = String(a.t ?? "").split("|");
+  const w = Math.max(...lines.map((l) => l.length)) * 20 + 64, h = lines.length * 46 + 38;
+  // a curved, tapering tail from the balloon toward the speaker's head (stops short of it)
+  const e = edgeToward(w * 0.86, h * 0.96, a.to), d = [a.to[0] - e[0], a.to[1] - e[1]], len = Math.hypot(...d) || 1;
+  const L = Math.max(34, Math.min(110, len - 24)), u = [d[0] / len, d[1] / len], nrm = [-u[1], u[0]], bw = Math.min(30, w * 0.12);
+  const tip = [e[0] + u[0] * L, e[1] + u[1] * L], b1 = [e[0] + nrm[0] * bw - u[0] * 14, e[1] + nrm[1] * bw - u[1] * 14], b2 = [e[0] - nrm[0] * bw - u[0] * 14, e[1] - nrm[1] * bw - u[1] * 14];
+  const c1 = [e[0] + u[0] * L * 0.55 + nrm[0] * bw * 0.5, e[1] + u[1] * L * 0.55 + nrm[1] * bw * 0.5];
+  const tailPath = `M${pt(b1)} Q${pt(c1)} ${pt(tip)} Q${pt([e[0] + u[0] * L * 0.4, e[1] + u[1] * L * 0.4])} ${pt(b2)} Z`;
+  const rect = `<rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="${h * 0.42}"/>`;
+  return `<g transform="translate(${o[0]},${o[1]})">${BUBBLE_DEFS}
+    <g transform="translate(7,9)" fill="rgba(20,20,30,.22)">${rect}<path d="${tailPath}"/></g>
+    <path d="${tailPath}" fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+    <g fill="url(#bubbleShade)" stroke="${P.ink}" stroke-width="5">${rect}</g><path d="${tailPath}" fill="url(#bubbleShade)"/>
+    <path d="M${-w / 2 + h * 0.4},${-h / 2 + 9} L${w / 2 - h * 0.6},${-h / 2 + 9}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>` +
+    lines.map((l, i) => `<text x="0" y="${(i - (lines.length - 1) / 2) * 46 + 14}" text-anchor="middle" font-size="38" fill="#1b1b22" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`).join("") + `</g>`;
+}
 export const PROPS = {
   // small dog in side view, trotting when arg.walk (legs cycle with arg.t), tail wag
   dog: (o, a = {}) => {
@@ -343,6 +381,7 @@ export const PROPS = {
     return g + `</g>`;
   },
   thought: (o, a = {}) => {
+    if (a.to) return bubbleThought(o, a);
     const lines = a.pic ? [" ".repeat(6)] : String(a.t ?? "").split("|"), tail = a.tail ?? -1;
     const w = a.w ?? Math.max(...lines.map((l) => l.length)) * 19 + 80, h = lines.length * 44 + 52;
     let bumps = "";
@@ -381,6 +420,7 @@ export const PROPS = {
     </g>`;
   },
   say: (o, a = {}) => {
+    if (a.to) return bubbleSay(o, a);
     const lines = String(a.t ?? "").split("|"), tail = a.tail ?? -1;
     const w = Math.max(...lines.map((l) => l.length)) * 20 + 64, h = lines.length * 46 + 38;
     const tailPath = `M${tail * w * 0.12},${h / 2 - 4} Q${tail * w * 0.2},${h / 2 + 26} ${tail * w * 0.34},${h / 2 + 42} Q${tail * w * 0.26},${h / 2 + 12} ${tail * w * 0.3},${h / 2 - 4} Z`;
@@ -467,7 +507,7 @@ export function character(pose) {
     if (!pose[side]) continue;
     const [E, W] = limb(S, spec, LEN.upper, LEN.fore);
     const hand = add(W, dir(angleOf(E, W)), 6);
-    g += `<g transform="translate(${pt(hand)})">${HELD[pose[side]] ?? ""}</g>`;
+    g += `<g transform="translate(${pt(hand)}) rotate(${f(pose[side + "Rot"] ?? 0)})">${HELD[pose[side]] ?? ""}</g>`;
   }
   for (const p of pose.props ?? []) g += PROPS[p.type](p.at, p.arg);
   return `<g transform="translate(0,${-(pose.lift ?? 0)})">${g}</g>`;
@@ -653,7 +693,7 @@ export const POSES = {
   },
   phone: {
     label: "Phone", expr: "focused", headTilt: 10,
-    armR: { target: [26, -96], bend: 1 }, armL: { target: [10, -70], bend: -1 }, holdR: "phone",
+    armR: { target: [30, -50], bend: 1 }, armL: { a1: -12, a2: -6 }, holdR: "phone",
   },
   coffee: {
     label: "Coffee", expr: "happy",

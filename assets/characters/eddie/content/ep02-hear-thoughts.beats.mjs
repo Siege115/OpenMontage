@@ -31,11 +31,11 @@ const studio = (tone) => ({ name: "studio", tone });
 export const BEATS = [
   // ================= HOOK =================
   { pose: "lieAwake", expr: "neutral", x: 470, y: 690, blanket: true, scene: { name: "bedroom", clock: "7:02" },
-    items: [ON(T("where are my socks?!", 1500, 260, 1.2, -1), "Thinking")], text: "Tomorrow morning, you wake up… and you hear a voice. It's your neighbor. Through the wall. Thinking." },
+    items: [ON({ ...T("where are my socks?!", 1500, 260, 1.2, 1), who: "none" }, "Thinking")], text: "Tomorrow morning, you wake up… and you hear a voice. It's your neighbor. Through the wall. Thinking." },
   { pose: "shocked", x: 1080, scene: { name: "bedroom", clock: "7:03" }, text: "You can hear everyone's thoughts." },
   { pose: "walk", walk: [200, 900], scene: { name: "street", day: true },
     people: [{ x: 1300, ...SAM, anim: "wave", animTo: 2.4, flip: true }, { walk: [1900, 1500], acc: "pigtails", anim: "walk", flip: true, dog: true }],
-    items: [ON(T("is it Friday yet?", 1640, 300, 1.6, -1), "secret"), ON(T("cute dog!", 1180, 150, 2.6, 1), "opinion")],
+    items: [ON({ ...T("is it Friday yet?", 1640, 300, 1.6, -1), who: 1 }, "secret"), ON({ ...T("cute dog!", 1300, 150, 2.6, 1), who: 0 }, "opinion")],
     text: "Not their voices. Their thoughts. Every secret. Every opinion. Every random little idea." },
   { pose: "celebrate", scene: studio("#fbefc4"), card: "NEVER LIED TO AGAIN", text: "It sounds like the ultimate superpower. You'd never be lied to again." },
   { pose: "crossArms", x: 960, scene: studio("#f9dcd6"), cam: { from: [960, 520], to: [960, 330], z0: 1.0, z1: 1.6 },
@@ -65,8 +65,8 @@ export const BEATS = [
     text: "By day three, rush hour hits. Normally, your brain filters noise. Scientists call it the cocktail party effect: you can tune out a room and hear one voice." },
   { pose: "coverEars", x: 960, scene: { name: "subway", ad: "YOUR BRAIN FILTERS VOICES", ad2: "…BUT NOT THOUGHTS" },
     people: [{ x: 420, acc: "bun", anim: "strap" }, { x: 640, acc: "cap:#e5584f", anim: "strap" }, { x: 1280, acc: "glasses", flip: true, anim: "scroll" }, { x: 1520, acc: "beanie", flip: true, anim: "watch" }],
-    items: [T("milk, eggs, bread", 420, 230, 0.2, 1), T("rent is due…", 640, 120, 0.6, 1), T("so tired", 1280, 230, 1.0, -1), T("I'm late!!", 1520, 120, 1.4, -1),
-      T("is that guy ok?", 960, 90, 1.8, -1, 0.9), T("what's that smell", 230, 110, 2.2, 1, 0.9)],
+    items: [{ ...T("milk, eggs, bread", 380, 230, 0.2, 1, 0.85), who: 0, life: 1.5 }, { ...T("rent is due…", 680, 230, 0.6, 1, 0.85), who: 1, life: 1.5 }, { ...T("so tired", 1280, 230, 1.0, -1, 0.85), who: 2, life: 1.5 }, { ...T("I'm late!!", 1560, 230, 1.4, -1, 0.85), who: 3, life: 1.5 },
+      { ...T("is that guy ok?", 1240, 230, 2.2, -1, 0.85), who: 2, life: 1.6 }, { ...T("what's that smell", 380, 230, 2.0, 1, 0.85), who: 0, life: 1.6 }],
     text: "But thoughts have no volume knob. Fifty minds, all talking at once." },
   { pose: "think", scene: studio("#e3f2df"), quiz: { q: "THOUGHTS PER DAY?", options: ["600", "6,000", "60,000"], answer: 1, on: ["hundred", "thousand", "sixty"] }, pause: 3.2,
     text: "Quick guess. How many thoughts does the average person have in a single day? Six hundred? Six thousand? Or sixty thousand?" },
@@ -76,7 +76,7 @@ export const BEATS = [
   { pose: "sitBench", x: 1150, settle: 1.4, scene: { name: "park" }, cam: { from: [960, 540], to: [920, 560], z0: 1.0, z1: 1.04 },
     act: [{ at: 0, holdR: "bread", armR: [30, -60], dur: 0.01 }, { on: "ducks", off: -1.0, armR: [62, -24], dur: 0.35 }, { on: "ducks", off: -0.6, armR: [-40, -112], dur: 0.22 }, { on: "ducks", off: 0.2, armR: [30, -60], dur: 0.6 }],
     crumbs: { on: "ducks", off: -0.4, from: [1076, 533], to: [450, 930] },
-    items: [{ type: "duck", x: 330, y: 945, scale: 1.7, quackOn: "ducks", arg: {} }, ON({ type: "thought", arg: { pic: "bread", tail: -1 }, x: 470, y: 700, scale: 1.4 }, "ducks")],
+    items: [{ type: "duck", x: 330, y: 945, scale: 1.7, quackOn: "ducks", arg: {} }, ON({ type: "thought", arg: { pic: "bread", tail: -1 }, x: 470, y: 700, scale: 1.4, who: [380, 880] }, "ducks")],
     text: "The park helps. Turns out, ducks don't think in words." },
 
   // ================= DAY 7: the party =================
@@ -115,8 +115,8 @@ export const BEATS = [
   // ================= DAY 14: unfiltered =================
   { pose: "giveGift", day: "DAY 14", x: 760, scene: { name: "living" },
     act: [{ at: 0, armR: [74, -60], dur: 0.01 }, { on: "loves", off: -0.42, holdR: null, dur: 0.01 }, { on: "loves", off: -0.3, armR: [28, 4], dur: 0.5 }],
-    people: [{ x: 1060, s: 1, ...MOM, flip: true, act: [{ on: "loves", off: -0.9, armR: [80, -60], dur: 0.45 }, { on: "loves", off: -0.42, holdR: "gift", dur: 0.01, sfx: "foley-paper-slide", sfxAt: 0 }, { on: "loves", off: -0.3, armR: [30, -150], dur: 0.5 }, { on: "head", off: -0.4, armR: [22, -58], dur: 0.5, expr: "neutral" }] }],
-    items: [ON(SAY("I love it!", 1120, 280, 1.2, 1), "loves"), ON(T("where am I going|to put this?", 1530, 200, 2.6, -1, 0.9), "head")],
+    people: [{ x: 1060, s: 1, ...MOM, flip: true, act: [{ on: "loves", off: -0.9, armR: [80, -60], dur: 0.45 }, { on: "loves", off: -0.42, holdR: "gift", dur: 0.01, sfx: "foley-paper-slide", sfxAt: 0 }, { on: "loves", off: -0.3, armR: [56, -104], dur: 0.5 }, { on: "head", off: -0.4, armR: [22, -58], dur: 0.5, expr: "neutral" }] }],
+    items: [ON({ ...SAY("I love it!", 1110, 300, 1.2, 1), who: 0, life: 1.9 }, "loves"), ON({ ...T("where am I going|to put this?", 1420, 190, 2.6, -1, 0.9), who: 0 }, "head")],
     text: "Two weeks in, the unfiltered truth arrives. Your mom loves your gift. Out loud. In her head? Not so much." },
   { pose: "shrug", x: 960, scene: { name: "street", day: true },
     people: [{ x: 420, acc: "beanie", anim: "watch" }, { x: 1520, acc: "cap:#e5584f", flip: true, anim: "icecream" }],
@@ -137,7 +137,7 @@ export const BEATS = [
   { pose: "explain", scene: studio("#e3f2df"), card: "SOME PEOPLE HAVE NO INNER VOICE",
     text: "It's real: some people report having little or no inner voice at all. Their thoughts work more like pictures, or feelings, than words." },
   { pose: "sitBench", x: 1150, scene: { name: "park" }, people: [{ x: 1500, ...MIA, pose: "sitBench", flip: true }],
-    items: [SAY("you don't talk much.", 1150, 300, 0.6, 1), SAY("don't need to.", 1500, 170, 2.8, -1)],
+    items: [{ ...SAY("you don't talk much.", 1100, 300, 0.6, 1), who: "eddie" }, { ...SAY("don't need to.", 1560, 170, 2.8, -1), who: 0 }],
     text: "So you start spending every day with her. Being near Mia is like stepping out of a concert, into a library." },
   { pose: "idea", expr: "calm", x: 960, scene: { name: "park" }, text: "For the first time in weeks, you can hear your own thoughts again." },
 

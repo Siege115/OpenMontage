@@ -616,19 +616,31 @@ function frameSVG(t) {
     if (pa === "watch" && on()) { // checks the time, impatient foot tap
       const c = cyc(3.2); q.armL = { target: [-6, -66], bend: -1 }; q.headTilt += 10 * pulse(c, 0.2, 1.6); q.legR = { ...q.legR, a1: (q.legR.a1 ?? 10) + 5 * Math.max(0, Math.sin(tc * 14)) * (c > 1.8 ? 1 : 0) };
     }
-    if (pa === "scroll" && on()) { // phone held at the chest, thumb flicks
-      q.armR = { target: [20, -66], bend: 1 }; q.holdR = "phone"; q.armL = { target: [6 + Math.max(0, Math.sin(tc * 5)) * 6, -62], bend: -1 }; q.headTilt += 8;
+    if (pa === "scroll" && on()) { // phone in one hand at chest height, eyes down, a small flick now and then
+      const c = cyc(2.4), fl = pulse(c, 1.6, 0.25);
+      q.armR = { target: [30, -50 - fl * 4], bend: 1 }; q.holdR = "phone"; q.holdRRot = -6 + fl * 4; q.armL = { a1: -12, a2: -6 }; q.headTilt += 12;
     }
-    if ((pa === "sip" || pa === "icecream") && on()) { // food/drink to the mouth every few seconds
-      const c = cyc(3.6), up = pulse(c, 1.4, 1.1); q.holdR = pa === "sip" ? (pp.hold ?? "coffee") : "icecream";
-      q.armR = { target: [30 - 18 * up, -52 - 80 * up], bend: 1 }; q.headTilt += -4 * up;
+    if ((pa === "sip" || pa === "icecream") && on()) { // raise to the mouth, taste, savour, lower — every ~5 s
+      const ice = pa === "icecream", c = cyc(5.2, 0.8), eio = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
+      const up = c < 1.0 ? 0 : c < 1.6 ? eio((c - 1.0) / 0.6) : c < 2.6 ? 1 : c < 3.2 ? 1 - eio((c - 2.6) / 0.6) : 0;
+      const at = c >= 1.6 && c < 2.6, lick = ice && at ? Math.max(0, Math.sin((c - 1.6) * Math.PI * 3)) : 0;
+      q.holdR = ice ? "icecream" : (pp.hold ?? "coffee");
+      // the cup/cone stops at the side of the mouth (not over the face); drinks tilt, cones get licked
+      q.armR = { target: [30 - (ice ? 0 : 6) * up, -48 - (ice ? 54 : 58) * up + lick * 6], bend: 1 };
+      q.holdRRot = ice ? -10 * up : -38 * up * (at ? 1 : 0.6);
+      q.headTilt += ice ? (8 * up + lick * 4) : (-7 * up);
+      if (at) q.mouth = ice ? 0.4 + lick * 0.4 : 0.15;
+      if (c >= 2.7 && c < 3.9) q.expr = "happy"; // tasting it
+      if (c >= 2.7 && c < 3.9 && pp.yum !== false) q.yum = (c - 2.7) / 1.2;
     }
     if (pa === "wipe" && on()) { // wiping the counter in slow circles
       const w = tc * 2.4; q.holdR = "cloth"; q.armR = { target: [44 + Math.cos(w) * 22, -34 + Math.sin(w) * 6], bend: 1 }; q.lean += 6 + Math.cos(w) * 2; q.headTilt += 8;
     }
-    if (pa === "write" && on()) { // clipboard + pen scribbles
-      q.holdL = "clipboard"; q.armL = { target: [-14, -70], bend: -1 }; q.holdR = "pen";
-      q.armR = { target: [-4 + Math.sin(tc * 9) * 5, -76 + Math.sin(tc * 13) * 3], bend: 1 }; q.headTilt += 10;
+    if (pa === "write" && on()) { // clipboard held at the waist, small steady pen strokes, glances up every few seconds
+      const c = cyc(3.8), look = pulse(c, 2.8, 0.9), wr = 1 - look;
+      q.holdL = "clipboard"; q.armL = { target: [-8, -30], bend: -1 }; q.holdR = "pen"; q.holdRRot = -20;
+      q.armR = { target: [10 + Math.sin(tc * 6) * 2.2 * wr + ((tc * 0.8) % 1) * 6 * wr, -40 + Math.sin(tc * 11) * 1.2 * wr - look * 6], bend: 1 };
+      q.headTilt += 12 * wr;
     }
     if (pa === "newspaper" && on()) { q.holdR = "newspaper"; q.armR = { target: [20, -72], bend: 1 }; q.armL = { target: [-22, -70], bend: -1 }; q.headTilt += 6 + Math.sin(tc * 0.8) * 2; }
     if ((pa === "read" || pp.pose === "read") && on()) { // turns a page every ~4 s
@@ -642,6 +654,10 @@ function frameSVG(t) {
     const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
     world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
     world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
+    if (q.yum !== undefined) { // a little "mmm!" floats up while they savour it
+      const u = q.yum, a2 = Math.min(1, u / 0.15, (1 - u) / 0.25);
+      world += `<g opacity="${a2.toFixed(3)}" transform="translate(${(px + (pp.flip ? -1 : 1) * 70 * ps).toFixed(1)},${(ppy - 230 * ps - u * 40).toFixed(1)}) rotate(-8) scale(${(0.8 + 0.2 * EASE.back.out(Math.min(1, u * 3))).toFixed(3)})"><text text-anchor="middle" font-size="44" fill="#fff" stroke="#1b1b20" stroke-width="9" paint-order="stroke" style="font-family:Bubble,InkHand,sans-serif;font-weight:800">${pp.yumText ?? "mmm!"}</text></g>`;
+    }
     if (pp.dog) { // a dog trotting ahead on a leash from the walker's hand
       const fs = pp.flip ? -1 : 1, hx = px + fs * ps * 44, hy = ppy + ps * (-22 - (q.lift ?? 0)), dx = px + fs * ps * 120, dy = pp.y ?? GROUND;
       world += `<path d="M${hx.toFixed(1)},${hy.toFixed(1)} Q${((hx + dx) / 2).toFixed(1)},${(Math.max(hy, dy - 60) + 40).toFixed(1)} ${(dx + fs * 26).toFixed(1)},${(dy - 80).toFixed(1)}" fill="none" stroke="#e5584f" stroke-width="4"/>`;
@@ -649,19 +665,54 @@ function frameSVG(t) {
     }
   }
   const layerOf = (it) => it.type === "thought" || it.type === "say" ? "bubble" : it.fg ? "fg" : "back";
+  const placedB = [];
   const drawItems = (layer) => { let out = ""; for (const it of b.items ?? []) {
     if (layerOf(it) !== layer) continue;
     if (it.delay && lt < it.delay) continue;
+    if (it.life && lt > it.delay + it.life + 0.2) continue;
     let pop = 1, op = 1;
     if (it.delay !== undefined) {
       pop = 0.2 + 0.8 * spring(lt - it.delay, { stiffness: 260, damping: 13 });           // springy entrance
-      const out = seg(lt, b.dur - 0.2, 0.18, EASE.power2.in);                              // quick, accelerating exit
+      const out = seg(lt, it.life ? it.delay + it.life : b.dur - 0.2, 0.18, EASE.power2.in); // quick, accelerating exit (or after `life` s)
       pop *= 1 - 0.35 * out; op = 1 - out;
     }
     const fl = it.type === "thought" || it.type === "say" ? Math.sin(t * 1.8 + it.x * 0.01) * 5 : 0;
+    // aim the bubble's tail at whoever is thinking / talking (it.who: "eddie" | person index | [x, y]; inferred if absent)
+    const bub = it.type === "thought" || it.type === "say";
+    let aim = null;
+    if (bub && it.who !== "none") {
+      const heads = [{ k: "eddie", x: cx, y: py - (pose.lift ?? 0) * SCALE - (POSE_LIB[b.pose].sit ? 204 : 204) * SCALE }];
+      for (const [pi, pp] of (b.people ?? []).entries()) {
+        const ps = SCALE * (pp.s ?? 0.92), lib = POSE_LIB[pp.pose ?? "stand"], ppy = (pp.y ?? GROUND) - (lib.sitH ?? (lib.sit ? 58 : 130)) * ps;
+        heads.push({ k: pi, x: pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x, y: ppy - 204 * ps });
+      }
+      if (Array.isArray(it.who)) aim = { x: it.who[0], y: it.who[1] };
+      else if (it.who !== undefined) aim = heads.find((h) => h.k === it.who);
+      else aim = heads.slice().sort((p1, p2) => Math.abs(p1.x - it.x) - Math.abs(p2.x - it.x))[0];
+    }
+    const sc0 = (it.scale ?? 1.4) * pop;
+    // keep a visible gap between bubble and head so the tail / dots always show
+    let ix = it.x, iy = it.y;
+    if (aim && bub) {
+      const ln = it.arg?.pic ? 1 : String(it.arg?.t ?? "").split("|").length, longest = it.arg?.pic ? 6 : Math.max(...String(it.arg?.t ?? "").split("|").map((l) => l.length));
+      const S0 = it.scale ?? 1.4, bw = (it.type === "say" ? longest * 20 + 64 : longest * 19 + 80) * S0, bh = (it.type === "say" ? ln * 46 + 38 : ln * 44 + 52) * S0;
+      const need = it.type === "say" ? 62 : 80, gap = aim.y - (iy + bh / 2), TOP = 128; // stay under the HUD
+      if (gap < need) iy -= need - gap;
+      if (iy - bh / 2 < TOP) { iy = TOP + bh / 2; if (aim.y - (iy + bh / 2) < need * 0.6) { // no room above: sit beside the head instead
+        ix = aim.x + (Math.sign(it.x - aim.x) || (aim.x < W / 2 ? 1 : -1)) * (bw / 2 + 120); iy = Math.max(TOP + bh / 2, aim.y + 10);
+      } }
+      // don't sit on top of a bubble that's already up: slide sideways
+      for (const r of placedB) {
+        const ox = Math.min(ix + bw / 2, r.x + r.w / 2) - Math.max(ix - bw / 2, r.x - r.w / 2), oy = Math.min(iy + bh / 2, r.y + r.h / 2) - Math.max(iy - bh / 2, r.y - r.h / 2);
+        if (ox > 0 && oy > 0) ix += (ix >= r.x ? 1 : -1) * (ox + 16);
+      }
+      ix = Math.min(W - bw / 2 - 10, Math.max(bw / 2 + 10, ix));
+      placedB.push({ x: ix, y: iy, w: bw, h: bh });
+    }
     let arg = it.type === "duck" ? { ...it.arg, t, quack: it.quackAt !== undefined && lt >= it.quackAt && lt < it.quackAt + 0.22 } : it.arg;
     if (it.winAt) arg = { ...arg, wins: (arg?.wins ?? 0) + it.winAt.reduce((acc, w) => acc + EASE.power3.out(Math.min(1, Math.max(0, (lt - w) / 0.55))), 0) };
-    out += `<g opacity="${op.toFixed(3)}" transform="translate(${it.x},${it.y + fl}) scale(${(it.scale ?? 1.4) * pop})">${PROPS[it.type]([0, 0], arg)}</g>`;
+    if (aim) arg = { ...arg, to: [(aim.x - ix) / sc0, (aim.y - 14 - (iy + fl)) / sc0] };
+    out += `<g opacity="${op.toFixed(3)}" transform="translate(${ix.toFixed(1)},${(iy + fl).toFixed(1)}) scale(${sc0})">${PROPS[it.type]([0, 0], arg)}</g>`;
   } return out; };
   world += drawItems("back");
   if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
@@ -834,7 +885,7 @@ const tag = VERTICAL ? "9x16" : "16x9";
 if (args.includes("--stills")) {
   mkdirSync(join(outDir, `stills-${tag}`), { recursive: true });
   for (const b of BEATS) {
-    await page.evaluate((svg) => { document.getElementById("s").innerHTML = svg; }, frameSVG(b.start + Math.min(1.0, b.dur * 0.5)));
+    await page.evaluate((svg) => { document.getElementById("s").innerHTML = svg; }, frameSVG(args.includes("--stills-late") ? b.start + b.dur - 0.4 : b.start + Math.min(1.0, b.dur * 0.5)));
     await page.screenshot({ path: join(outDir, `stills-${tag}`, `beat-${String(b.idx).padStart(2, "0")}.jpg`), type: "jpeg", quality: 80 });
   }
   await browser.close();
