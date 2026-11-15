@@ -213,6 +213,7 @@ for (const [k, [src, fx]] of Object.entries(SFX)) {
   if (!existsSync(f)) sh("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", src, "-af", fx, "-ar", "44100", "-ac", "1", f]);
   sfxPcm[k] = readPcm(f);
 }
+const THREE_D = args.includes("--3d"); // real 3D sets (Three.js) behind/in front of the cartoon layer
 const POSE_LIB = { ...POSES, stand: { expr: "neutral" } };
 
 const sceneKey = (b) => JSON.stringify(b.scene ?? null);
@@ -635,7 +636,8 @@ function frameSVG(t) {
   const light = (sn === "street" && !sopt.day) || (sn === "bedroom" && sopt.night) || (sn === "living" && sopt.night) || (sn === "desk" && sopt.night) || sn === "road" ? "night"
     : sn === "rooftop" ? "sunset" : sn === "party" || sn === "concert" ? "party" : null;
   const lightF = light ? `url(#lit-${light})` : "none";
-  let world = `<g filter="url(#dof)">${sc.bg}</g>`;
+  let world = THREE_D ? "" : `<g filter="url(#dof)">${sc.bg}</g>`;
+  const FEET = []; // where everyone stands (3D mode drops real floor shadows there)
   // background people (other stick figures), then props / thought bubbles that pop in on cue
   for (const [pi, pp] of (b.people ?? []).entries()) {
     const key = JSON.stringify(pp);
@@ -717,7 +719,8 @@ function frameSVG(t) {
     if (!NO_BLINK.has(q.expr) && ((tc + pi * 1.3) % 3.1) < 0.13) q.expr = "blink";
     const ps = SCALE * (pp.s ?? 0.92), ppy = (pp.y ?? GROUND) - (POSE_LIB[pp.pose ?? "stand"].sitH ?? (POSE_LIB[pp.pose ?? "stand"].sit ? 58 : 130)) * ps;
     const px = pp.walk ? pp.walk[0] + (pp.walk[1] - pp.walk[0]) * Math.min(1, lt / b.dur) : pp.x;
-    world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
+    FEET.push({ x: px, r: 1.05 * (pp.s ?? 0.92) });
+    if (!THREE_D) world += `<ellipse cx="${px}" cy="${(pp.y ?? GROUND) + 6}" rx="${105 * (pp.s ?? 0.92)}" ry="14" fill="url(#softShadow)"/>`;
     world += `<g filter="${lightF}"><g transform="translate(${px},${ppy}) scale(${(pp.flip ? -1 : 1) * ps},${ps})">${character(q)}</g></g>`;
     if (q.yum !== undefined) { // a little "mmm!" floats up while they savour it
       const u = q.yum, a2 = Math.min(1, u / 0.15, (1 - u) / 0.25);
@@ -749,7 +752,7 @@ function frameSVG(t) {
     out += `<g opacity="${op.toFixed(3)}" transform="translate(${ix.toFixed(1)},${(iy + fl).toFixed(1)}) scale(${sc0})">${PROPS[it.type]([0, 0], arg)}</g>`;
   } return out; };
   world += drawItems("back");
-  if (b.pose !== "lie" && b.pose !== "lieAwake") world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`;
+  if (b.pose !== "lie" && b.pose !== "lieAwake") { FEET.push({ x: cx, r: 1.2 - (pose.lift ?? 0) / 100 }); if (!THREE_D) world += `<ellipse cx="${cx}" cy="${GROUND + 6}" rx="${120 - pose.lift}" ry="16" fill="url(#softShadow)"/>`; }
   const footY = POSE_LIB[b.pose].sit ? py : GROUND;
   world += `<g filter="${lightF}"><g transform="translate(${cx},${footY}) scale(${sx},${sy}) translate(${-cx},${-footY})"><g transform="translate(${cx},${py}) scale(${SCALE})">${character(pose)}</g></g></g>`;
   // reaction pops: picked from Eddie's expression / pose, spring in near his head
@@ -779,7 +782,7 @@ function frameSVG(t) {
   }
   if (b.crumbs && b.crumbs.at !== undefined && lt >= b.crumbs.at && lt < b.crumbs.at + 1.6) world += PROPS.crumbs([0, 0], { ...b.crumbs, p: Math.min(1, (lt - b.crumbs.at) / 0.9) });
   world += drawItems("fg"); // tables etc. in front of the characters
-  world += sc.fg;
+  if (!THREE_D) world += sc.fg;
   world += drawItems("bubble"); // speech/thought bubbles always on top
   if (b.blanket) world += `<path d="M330,640 Q520,600 700,650 L700,800 Q480,820 300,800 Z" fill="#7fa7d9" stroke="${ink}" stroke-width="5" stroke-linejoin="round"/><path d="M340,680 Q520,650 690,690" fill="none" stroke="#6a92c6" stroke-width="5"/>`;
   // screen shake on impacts (first ~6 frames)
@@ -795,7 +798,7 @@ function frameSVG(t) {
     if (style === "iris") { trFilter = `<clipPath id="iris"><circle cx="${OW / 2}" cy="${OH / 2}" r="${e * Math.hypot(OW, OH) * 0.6}"/></clipPath>`; wrapOpen = `<rect width="${OW}" height="${OH}" fill="#000"/><g clip-path="url(#iris)">`; wrapClose = "</g>"; }
     if (style === "flash") wrapClose = `<rect width="${OW}" height="${OH}" fill="#fff" opacity="${(1 - Math.min(1, lt / 0.12)).toFixed(3)}"/>`;
   }
-  let s = `${wrapOpen}<g transform="translate(${OW / 2 + jx + tx},${OH / 2 + jy}) scale(${cam.s.toFixed(4)}) translate(${-cam.fx},${-cam.fy})">${world}</g>${wrapClose}`;
+  let s = THREE_D ? "" : `${wrapOpen}<g transform="translate(${OW / 2 + jx + tx},${OH / 2 + jy}) scale(${cam.s.toFixed(4)}) translate(${-cam.fx},${-cam.fy})">${world}</g>${wrapClose}`;
   s += `<rect width="${OW}" height="${OH}" fill="url(#vig)"/>`;
 
   // HUD -------------------------------------------------------------
@@ -882,6 +885,20 @@ function frameSVG(t) {
   if (TR[i + 1] === "dip" && lt > b.dur - 0.28) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${EASE.power2.in(Math.min(1, (lt - (b.dur - 0.28)) / 0.28)).toFixed(3)}"/>`;
   const fade = Math.min(1, t / 0.4, (TOTAL - t) / 0.8);
   if (fade < 1) s += `<rect width="${OW}" height="${OH}" fill="#000" opacity="${(1 - Math.max(0, fade)).toFixed(3)}"/>`;
+  const DEFS3 = `<radialGradient id="softShadow"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="lit-night"><feColorMatrix type="matrix" values="0.78 0 0 0 0.02  0 0.82 0 0 0.03  0 0 0.95 0 0.08  0 0 0 1 0"/></filter>
+    <filter id="lit-sunset"><feColorMatrix type="matrix" values="1 0 0 0 0.04  0 0.9 0 0 0.02  0 0 0.8 0 0  0 0 0 1 0"/></filter>
+    <filter id="lit-party"><feColorMatrix type="matrix" values="0.95 0 0 0 0.015  0 0.9 0 0 0  0 0 0.98 0 0.03  0 0 0 1 0"/></filter>`;
+  if (THREE_D) {
+    const si = b.shots.indexOf(shot), yaw = (((b.idx * 37 + si * 53) % 5) - 2) * 3.2 + Math.sin(t * 0.25 + b.idx) * 1.2;
+    return {
+      world: `<svg xmlns="http://www.w3.org/2000/svg" width="${W * 2}" height="${H * 2}" viewBox="0 0 ${W} ${H}"><defs>${DEFS3}</defs>${world}</svg>`,
+      hud: `<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}" viewBox="0 0 ${OW} ${OH}"><defs>
+        <linearGradient id="capBandTop" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#000" stop-opacity="0.42"/></linearGradient><linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.32"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient>
+        <radialGradient id="vig" cx="50%" cy="48%" r="75%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.32"/></radialGradient></defs>${s}</svg>`,
+      cam: { fx: cam.fx, fy: cam.fy, s: cam.s, blur: cam.blur, yaw, jx, jy }, scene: b.scene ?? { name: "studio" }, t: tc, feet: FEET, key: sceneKey(b),
+    };
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}" viewBox="0 0 ${OW} ${OH}"><defs>
     <filter id="dof" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${cam.blur}"/></filter>${trFilter}
     <radialGradient id="softShadow"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
@@ -899,9 +916,22 @@ const black = readFileSync(join(here, "montserrat-900.woff2")).toString("base64"
 const bubbleFont = readFileSync(join(here, "nunito-800.woff2")).toString("base64");
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
-const browser = await chromium.launch();
+const browser = await chromium.launch(THREE_D ? { args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] } : {});
 const page = await browser.newPage({ viewport: { width: OW, height: OH } });
-await page.setContent(`<html><head><style>
+let show = async (fr) => { await page.evaluate((svg) => { document.getElementById("s").innerHTML = svg; }, fr); };
+if (THREE_D) {
+  // tiny static server: the stage page, its modules, three.js and the fonts
+  const http = await import("node:http");
+  const routes = { "/three.module.js": join(here, "../../../node_modules/three/build/three.module.js"), "/hand.ttf": join(here, "../../../ink-theater/assets/patrickhand.ttf") };
+  const mime = { js: "text/javascript", mjs: "text/javascript", html: "text/html", woff2: "font/woff2", ttf: "font/ttf" };
+  const srv = http.createServer((q, r) => { const u = q.url.split("?")[0], f = routes[u] ?? join(here, u.replace(/\.\./g, "")); try { r.writeHead(200, { "content-type": mime[f.split(".").pop()] ?? "application/octet-stream" }); r.end(readFileSync(f)); } catch { r.writeHead(404); r.end(); } });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  page.on("pageerror", (e) => console.error("stage error:", e.message));
+  await page.goto(`http://127.0.0.1:${srv.address().port}/stage3d.html?w=${OW}&h=${OH}`);
+  await page.waitForFunction(() => window.stage?.ready);
+  page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") console.error("stage:", m.text().slice(0, 300)); });
+  show = async (fr) => { await page.evaluate((f) => window.stage.frame(f), fr); };
+} else await page.setContent(`<html><head><style>
   @font-face{font-family:InkHand;src:url(data:font/ttf;base64,${hand}) format("truetype");}
   @font-face{font-family:MBlack;font-weight:900;src:url(data:font/woff2;base64,${black}) format("woff2");}
   @font-face{font-family:Bubble;font-weight:800;src:url(data:font/woff2;base64,${bubbleFont}) format("woff2");}
@@ -915,11 +945,12 @@ const WIDTH = {}; let SPACE = 28;
   const res = await page.evaluate((ws) => { const c = document.createElement("canvas").getContext("2d"); c.font = "900 100px MBlack"; return { w: ws.map((x) => c.measureText(x).width), sp: c.measureText(" ").width }; }, words);
   words.forEach((w, i) => (WIDTH[w] = res.w[i])); SPACE = res.sp + 6;
 }
-const tag = VERTICAL ? "9x16" : "16x9";
+if (args.includes("--debug3d")) { const fr = frameSVG(1); await show(fr); console.log(JSON.stringify(fr.cam), fr.key, await page.evaluate(() => document.getElementById("w").style.transform)); }
+const tag = (VERTICAL ? "9x16" : "16x9") + (THREE_D ? "-3d" : "");
 if (args.includes("--stills")) {
   mkdirSync(join(outDir, `stills-${tag}`), { recursive: true });
   for (const b of BEATS) {
-    await page.evaluate((svg) => { document.getElementById("s").innerHTML = svg; }, frameSVG(args.includes("--stills-late") ? b.start + b.dur - 0.4 : b.start + Math.min(1.0, b.dur * 0.5)));
+    await show(frameSVG(args.includes("--stills-late") ? b.start + b.dur - 0.4 : b.start + Math.min(1.0, b.dur * 0.5)));
     await page.screenshot({ path: join(outDir, `stills-${tag}`, `beat-${String(b.idx).padStart(2, "0")}.jpg`), type: "jpeg", quality: 80 });
   }
   await browser.close();
@@ -933,7 +964,7 @@ const ff = spawn("ffmpeg", ["-y", "-v", "error", "-f", "image2pipe", "-framerate
 const frames = Math.ceil(TOTAL * FPS);
 const t1 = Date.now();
 for (let f = 0; f < frames; f++) {
-  await page.evaluate((svg) => { document.getElementById("s").innerHTML = svg; }, frameSVG(f / FPS));
+  await show(frameSVG(f / FPS));
   const buf = await page.screenshot({ type: "jpeg", quality: 90 });
   if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once("drain", r));
   if (f % (FPS * 30) === 0) console.log(`frame ${f}/${frames} (${((Date.now() - t1) / 1000).toFixed(0)}s)`);
