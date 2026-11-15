@@ -448,6 +448,7 @@ const SPOTS = new Map();
 function captionSpot(b, ch) {
   const key = b.idx + ":" + ch.s;
   if (SPOTS.has(key)) return SPOTS.get(key);
+  if (VERTICAL && b.card) { const r = { cx: OW / 2, y: 330, maxW: 960, top: true }; SPOTS.set(key, r); return r; } // the card owns the bottom
   const half = OW * 0.46, cands = [
     { cx: OW / 2, y: CAP_Y, maxW: VERTICAL ? 960 : 1650 },
     { cx: OW * 0.26, y: CAP_Y, maxW: half }, { cx: OW * 0.74, y: CAP_Y, maxW: half },
@@ -598,7 +599,9 @@ function frameSVG(t) {
   const shot = b.shots.find((s) => lt < s.e) ?? b.shots[b.shots.length - 1];
   const cam = camera(shot.type, (lt - shot.s) / (shot.e - shot.s), cx, py, b.pose, (b.idx + b.shots.indexOf(shot)) % 2 === 0, shot.custom);
   // keep every visible bubble fully in frame (under the HUD): pan, and if that's not enough, ease the zoom out
-  if (BL.size) {
+  const spanB = BL.size ? Math.max(...[...BL.values()].map((r) => r.x + r.w / 2)) - Math.min(...[...BL.values()].map((r) => r.x - r.w / 2)) : 0;
+  const cam0 = { ...cam };
+  if (BL.size && spanB + 40 / BASE <= OW / BASE) { // (a crowd of bubbles wider than the frame can't all fit: keep the shot on Eddie)
     for (let pass = 0; pass < 2; pass++) {
       let vw = OW / cam.s, vh = OH / cam.s, top = cam.fy - vh / 2, left = cam.fx - vw / 2;
       const m = 125 / cam.s, mx = 20 / cam.s;
@@ -612,6 +615,8 @@ function frameSVG(t) {
       cam.fx = Math.min(W - vw / 2, Math.max(vw / 2, cam.fx)); cam.fy = Math.min(H - vh / 2, Math.max(vh / 2, cam.fy));
     }
   }
+  // never lose the main character: if fitting the bubbles pushed Eddie's head out of frame, keep the original shot
+  if (Math.abs(cx - cam.fx) > OW / cam.s / 2 - 70 * SCALE && Math.abs(cx - cam0.fx) <= OW / cam0.s / 2 - 70 * SCALE) Object.assign(cam, cam0);
   // handheld drift: the camera is never perfectly still
   if (!shot.still) { cam.fx += Math.sin(t * 0.43) * 1.5; cam.fy += Math.cos(t * 0.37) * 1; } // barely-there drift
   // vertical: pan to whoever's thought just popped up (the bubbles are the story)
