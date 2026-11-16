@@ -945,7 +945,9 @@ const WIDTH = {}; let SPACE = 28;
   const res = await page.evaluate((ws) => { const c = document.createElement("canvas").getContext("2d"); c.font = "900 100px MBlack"; return { w: ws.map((x) => c.measureText(x).width), sp: c.measureText(" ").width }; }, words);
   words.forEach((w, i) => (WIDTH[w] = res.w[i])); SPACE = res.sp + 6;
 }
-if (args.includes("--at")) { const ts = opt("--at", "1").split(",").map(Number); mkdirSync(join(outDir, "at"), { recursive: true }); for (const tt of ts) { await show(frameSVG(tt)); await page.screenshot({ path: join(outDir, "at", `t${tt}.jpg`), type: "jpeg", quality: 85 }); } console.log("stills at", ts.join(",")); process.exit(0); }
+if (args.includes("--dumpworld")) { const fr = frameSVG(Number(opt("--dumpworld", "1"))); writeFileSync(join(outDir, "world.svg"), fr.world ?? fr); console.log("dumped", JSON.stringify(fr.cam ?? {})); process.exit(0); }
+if (args.includes("--at")) { const ts = opt("--at", "1").split(",").map(Number); mkdirSync(join(outDir, "at"), { recursive: true }); for (const tt of ts) { await show(frameSVG(tt)); await page.screenshot({ path: join(outDir, "at", `t${tt}.jpg`), type: "jpeg", quality: 85 });
+  if (args.includes("--layers")) for (const id of ["bg", "w", "fg", "s"]) { await page.evaluate((k) => { for (const e of document.querySelectorAll("#stage>*")) e.style.visibility = e.id === k ? "visible" : "hidden"; }, id); await page.screenshot({ path: join(outDir, "at", `t${tt}-${id}.jpg`), type: "jpeg", quality: 80 }); } } console.log("stills at", ts.join(",")); process.exit(0); }
 const tag = (VERTICAL ? "9x16" : "16x9") + (THREE_D ? "-3d" : "");
 if (args.includes("--stills")) {
   mkdirSync(join(outDir, `stills-${tag}`), { recursive: true });

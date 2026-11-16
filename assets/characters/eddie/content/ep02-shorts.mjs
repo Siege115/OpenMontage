@@ -24,7 +24,7 @@ export const SHORTS = {
   ],
   // C: Mia, the one silent mind (teases the twist without giving it away)
   c: [
-    { ...strip(find(/the one place that should be quiet/)), text: "For three weeks, you've heard every thought of every person you meet." },
+    { ...strip(find(/the one place that should be quiet/)), text: "Twenty-one days ago, you started hearing everyone's thoughts. Every single person." },
     { ...strip(find(/A girl named Mia/)), text: "Except one. A girl named Mia. Her mind is… completely silent." },
     { ...strip(find(/somebody just thought back/)), riser: 0.2, text: "And on day thirty, you find out why." },
     END("Watch the full story on the channel.", "#d9ecf7"),
