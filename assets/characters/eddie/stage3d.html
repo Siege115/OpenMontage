@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- 3D stage for render-episode.mjs --3d: [bg canvas: 3D set] [#w: cartoon layer, mapped onto the Z=0 plane] [fg canvas: 3D props in front] [#s: captions/HUD] -->
+<html><head><style>
+  @font-face{font-family:InkHand;src:url(/hand.ttf)}
+  @font-face{font-family:MBlack;font-weight:900;src:url(/montserrat-900.woff2)}
+  @font-face{font-family:Bubble;font-weight:800;src:url(/nunito-800.woff2)}
+  body{margin:0;overflow:hidden;background:#000} text{font-family:InkHand,sans-serif}
+  #stage{position:relative;overflow:hidden} #stage>*{position:absolute;left:0;top:0}
+  #w{transform-origin:0 0}
+</style></head><body>
+<div id="stage"><canvas id="bg"></canvas><div id="s"></div></div>
+<script type="module" src="/stage3d.js"></script>
+</body></html>
