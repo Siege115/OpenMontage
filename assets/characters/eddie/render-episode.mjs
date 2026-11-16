@@ -617,7 +617,7 @@ function frameSVG(t) {
     }
   }
   // never lose the main character: if fitting the bubbles pushed Eddie's head out of frame, keep the original shot
-  if (Math.abs(cx - cam.fx) > OW / cam.s / 2 - 70 * SCALE && Math.abs(cx - cam0.fx) <= OW / cam0.s / 2 - 70 * SCALE) Object.assign(cam, cam0);
+  if (!shot.custom && Math.abs(cx - cam.fx) > OW / cam.s / 2 - 70 * SCALE && Math.abs(cx - cam0.fx) <= OW / cam0.s / 2 - 70 * SCALE) Object.assign(cam, cam0); // (crafted camera moves are left alone)
   // handheld drift: the camera is never perfectly still
   if (!shot.still) { cam.fx += Math.sin(t * 0.43) * 1.5; cam.fy += Math.cos(t * 0.37) * 1; } // barely-there drift
   // vertical: pan to whoever's thought just popped up (the bubbles are the story)
@@ -945,7 +945,7 @@ const WIDTH = {}; let SPACE = 28;
   const res = await page.evaluate((ws) => { const c = document.createElement("canvas").getContext("2d"); c.font = "900 100px MBlack"; return { w: ws.map((x) => c.measureText(x).width), sp: c.measureText(" ").width }; }, words);
   words.forEach((w, i) => (WIDTH[w] = res.w[i])); SPACE = res.sp + 6;
 }
-if (args.includes("--debug3d")) { const fr = frameSVG(1); await show(fr); console.log(JSON.stringify(fr.cam), fr.key, await page.evaluate(() => document.getElementById("w").style.transform)); }
+if (args.includes("--at")) { const ts = opt("--at", "1").split(",").map(Number); mkdirSync(join(outDir, "at"), { recursive: true }); for (const tt of ts) { await show(frameSVG(tt)); await page.screenshot({ path: join(outDir, "at", `t${tt}.jpg`), type: "jpeg", quality: 85 }); } console.log("stills at", ts.join(",")); process.exit(0); }
 const tag = (VERTICAL ? "9x16" : "16x9") + (THREE_D ? "-3d" : "");
 if (args.includes("--stills")) {
   mkdirSync(join(outDir, `stills-${tag}`), { recursive: true });
@@ -964,8 +964,9 @@ const ff = spawn("ffmpeg", ["-y", "-v", "error", "-f", "image2pipe", "-framerate
 const frames = Math.ceil(TOTAL * FPS);
 const t1 = Date.now();
 for (let f = 0; f < frames; f++) {
-  await show(frameSVG(f / FPS));
+  const tA = Date.now(), fr = frameSVG(f / FPS), tB = Date.now(); await show(fr); const tC = Date.now();
   const buf = await page.screenshot({ type: "jpeg", quality: 90 });
+  if (args.includes("--timing") && (f < 3 || f % 30 === 0)) console.log(`frame ${f}: build ${tB - tA}ms, stage ${tC - tB}ms, shot ${Date.now() - tC}ms`);
   if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once("drain", r));
   if (f % (FPS * 30) === 0) console.log(`frame ${f}/${frames} (${((Date.now() - t1) / 1000).toFixed(0)}s)`);
 }
@@ -974,3 +975,4 @@ await new Promise((r) => ff.on("close", r));
 await browser.close();
 
 console.log("wrote", out, `${TOTAL.toFixed(1)}s`, TITLE);
+process.exit(0); // (the 3D stage's local server would otherwise keep the process alive)

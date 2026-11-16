@@ -6,7 +6,7 @@
   @font-face{font-family:Bubble;font-weight:800;src:url(/nunito-800.woff2)}
   body{margin:0;overflow:hidden;background:#000} text{font-family:InkHand,sans-serif}
   #stage{position:relative;overflow:hidden} #stage>*{position:absolute;left:0;top:0}
-  #w{transform-origin:0 0}
+  #w{transform-origin:0 0;will-change:transform;contain:strict;overflow:hidden}
 </style></head><body>
 <div id="stage"><canvas id="bg"></canvas><div id="w"></div><canvas id="fg"></canvas><div id="s"></div></div>
 <script type="module" src="/stage3d.js"></script>
